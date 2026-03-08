@@ -1,0 +1,8 @@
+pip install dotenv
+pip install playwright
+pip install PyQt6 PyQt6-WebEngine
+pip install openai google-genai
+pip install keyboard pyperclip markdown
+
+taskkill /F /IM msedge.exe
+"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" -ArgumentList "--remote-debugging-port=9222"
