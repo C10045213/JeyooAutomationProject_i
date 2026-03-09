@@ -22,6 +22,12 @@ try:
 except ImportError as e:
     print(f"Error importing modules: {e}")
 
+# ---------------- 
+os.environ["QT_OPENGL"] = "software"  
+os.environ["QT_XCB_FORCE_SOFTWARE_OPENGL"] = "1"
+os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = "--disable-gpu"
+# ---------------- 
+
 # ==========================================
 # 1. 原始逻辑封装 (Worker Thread)
 # ==========================================
@@ -57,13 +63,13 @@ class AutomationWorker(QThread):
 
     def initialize(self):
         self.log_signal.emit(">>> 初始化 Playwright 连接...")
-        self.playwright = sync_playwright().start()
         try:
+            self.playwright = sync_playwright().start()
             self.browser = self.playwright.chromium.connect_over_cdp("http://127.0.0.1:9222")
             return 
         except Exception as e:
             self.log_signal.emit(f"连接失败: {str(e)}")
-            self.close_all() # 报错时清理
+            self.close_all_browser() 
             return None
 
     def close_all_browser(self):
@@ -108,7 +114,7 @@ class AutomationWorker(QThread):
         problem_sn = ""
         save_path_choices = ""
         save_path_problem = ""
-        script_path = os.os.path.dirname(os.path.abspath(__file__))
+        script_path = os.path.dirname(os.path.abspath(__file__))
 
         try:
             problem_sn = operator_page.locator("td > a").first.inner_text()
@@ -120,8 +126,19 @@ class AutomationWorker(QThread):
             try:
                 choices_locator = operator_page.locator("table.ques")
                 if choices_locator.is_visible():
-                    save_path_choices = script_path + "{problem_sn}_problem_choices.png"
-                    choices_locator.screenshot(path=save_path_choices)
+                    save_path_choices = script_path + f"{problem_sn}_problem_choices.png"
+                    clone_handle = choices_locator.evaluate_handle("""original => {
+                        const clone = original.cloneNode(true);
+                        Object.assign(clone.style, {
+                            position: 'absolute', top: '0', left: '0', width: 'auto',
+                            height: 'auto', maxHeight: 'none', overflow: 'visible',
+                            zIndex: '2147483647', backgroundColor: '#ffffff', padding: '20px'
+                        });
+                        document.body.appendChild(clone);
+                        return clone;
+                    }""")
+                    clone_handle.screenshot(path=save_path_choices)
+                    clone_handle.evaluate("el => el.remove()")
                 else:
                     self.log_signal.emit("※非选择题※")
             except Exception as e:
@@ -130,8 +147,19 @@ class AutomationWorker(QThread):
             try:
                 problem_locator = operator_page.locator("div#Mark_Content_" + problem_sn)
                 if problem_locator.is_visible():
-                    save_path_problem = script_path + "{problem_sn}_problem.png"
-                    problem_locator.screenshot(path=save_path_problem)
+                    save_path_problem = script_path + f"{problem_sn}_problem.png"
+                    clone_handle = problem_locator.evaluate_handle("""original => {
+                        const clone = original.cloneNode(true);
+                        Object.assign(clone.style, {
+                            position: 'absolute', top: '0', left: '0', width: 'auto',
+                            height: 'auto', maxHeight: 'none', overflow: 'visible',
+                            zIndex: '2147483647', backgroundColor: '#ffffff', padding: '20px'
+                        });
+                        document.body.appendChild(clone);
+                        return clone;
+                    }""")
+                    clone_handle.screenshot(path=save_path_problem)
+                    clone_handle.evaluate("el => el.remove()")
                 else:
                     self.log_signal.emit("***※未能找到题目元素※***")
             except Exception as e:
@@ -265,6 +293,11 @@ class AutomationWorker(QThread):
                 except Exception as e:
                     self.log_signal.emit(f"文件读取错误: {e}")
                     continue
+                
+                # 于此删除本地图片
+                os.remove(problem_path)
+                if choices_path:
+                    os.remove(choices_path)
 
                 # 构造消息
                 content_payload = []
@@ -276,7 +309,8 @@ class AutomationWorker(QThread):
                 problem_response = Analyser.qwen_client.chat.completions.create(
                     model="qwen3-vl-flash",
                     messages=[{"role": "user", "content": content_payload}],
-                    stream=False,
+                    stream=True,
+                    stream_options={"include_usage": True},
                 )
 
                 for chunk in problem_response:

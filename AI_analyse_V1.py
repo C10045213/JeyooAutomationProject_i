@@ -66,7 +66,7 @@ class Reviewer:
     def _call_doubao(self, content: str) :
         """封装DUOBAO调用 + 结果解析"""
         response = doubao_client.responses.create(
-            model="doubao-seed-2.0-lite",
+            model="doubao-seed-2.0-lite-260215",
             input=[
                 {
                     "role": "user",
