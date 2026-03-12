@@ -33,7 +33,6 @@ class Reviewer:
     def __init__(self):
         # 客户端映射：key=选择编号，value=(名称, 通用调用函数)
         self.client_map = {
-            "0": ("EXIT","NULL"),
             "1": ("DeepSeek", self._call_deepseek),
             "2": ("doubao", self._call_doubao),
             "3": ("Google Gemini", self._call_google),
@@ -66,7 +65,7 @@ class Reviewer:
     def _call_doubao(self, content: str) :
         """封装DUOBAO调用 + 结果解析"""
         response = doubao_client.responses.create(
-            model="doubao-seed-2.0-lite-260215",
+            model="doubao-seed-2-0-lite-260215",
             input=[
                 {
                     "role": "user",
