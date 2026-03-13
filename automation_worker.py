@@ -1,10 +1,10 @@
 import keyboard
 import time
 from PyQt6.QtCore import QThread, pyqtSignal, QEventLoop
-from AI_analyse_V1 import Reviewer
+from AI_analyse_V1 import Analyser
 from broswer_manager import BrowserManager
 
-import task1
+import task1, task2
 
 class AutomationWorker(QThread):
     
@@ -16,22 +16,27 @@ class AutomationWorker(QThread):
         super().__init__()
         self.running = True
         self.hotkey = 'ctrl+alt+z' # 于此确认设置HOTKEY
-        self.reviewer = Reviewer()
+        self.analyser = Analyser()
         
         # 标志位
         self._task_requested = False   
         self._reinit_requested = False 
         self._rechooseAPI_requested = False
         self._requested_change_to_task1 = False
+        self._requested_change_to_task2 = False
         
         # Playwright
         self.browser_manager = BrowserManager(self.log_signal.emit)
+        self.pages = None
         
         # 当前执行的策略
         self.current_strategy = 0
 
     def request_change_strategy_to_task1(self):
         self._requested_change_to_task1 = True
+
+    def request_change_strategy_to_task2(self):
+        self._requested_change_to_task2 = True
 
     def request_reinit(self):
         self._reinit_requested = True
@@ -49,7 +54,7 @@ class AutomationWorker(QThread):
         self.log_signal.emit(f'=' * 20)
 
         keyboard.add_hotkey(self.hotkey, self._hotkey_callback)
-        self._rechooseAPI_requested = True  
+        self._rechooseAPI_requested = True 
 
         while self.running:
             # 1. 根据当前目标，执行重连和重新定位
@@ -70,9 +75,17 @@ class AutomationWorker(QThread):
                 self._rechooseAPI_requested = False
                 self.client_select_request()
 
+            # 4. 处理切换任务
             if self._requested_change_to_task1:
                 self._requested_change_to_task1 = False
                 self.change_strategy_to_task1()
+            
+            if self._requested_change_to_task2:
+                self._requested_change_to_task2 = False
+                self.change_strategy_to_task2()
+
+            # 5. 处理弹窗
+            self.check_pages_ondialog()
 
             time.sleep(0.1)
             
@@ -84,12 +97,13 @@ class AutomationWorker(QThread):
         """线程内部执行的重置逻辑"""
         connected = self.browser_manager.connect()
         if connected and self.current_strategy:
-            pages = self.browser_manager.get_all_pages()
-            self.current_strategy.locate_pages(pages) # Task的locate_pages函数名需统一
+            self.pages = self.browser_manager.get_all_pages()
+            self.current_strategy.locate_pages(self.pages) # 各Task的locate_pages函数名需统一
         elif self.current_strategy == None:
             print(f"错误：尚未连接或未选择任务")
             self.log_signal.emit(f"错误：尚未连接或未选择任务")
 
+    # rechoose AI API
     def client_select_request(self):
         """选择 AI 审核客户端"""
         ls = []
@@ -97,7 +111,7 @@ class AutomationWorker(QThread):
         self.log_signal.emit("请预先确认 VPN 已正确配置")
         self.log_signal.emit(f"*" * 20)
         self.log_signal.emit("请选择 AI 审核客户端:")
-        for num, name in self.reviewer.client_map.items():
+        for num, name in self.analyser.client_map.items():
             self.log_signal.emit(f"{num} . {name[0]}")
             ls.append(num)
 
@@ -115,7 +129,25 @@ class AutomationWorker(QThread):
         if self._loop:
             self._loop.quit()
 
+     # 应对各页面中需要手动处置的弹窗
+    def manual_check(self, dialog):
+        print(f"弹窗出现了")
+        dialog.accept() 
+    
+    def check_pages_ondialog(self):
+        if self.pages != None:
+            for page in self.pages:
+                page.on("dialog", self.manual_check)
+                page.wait_for_timeout(200)
+        else: pass
+
+    # 切换任务
     def change_strategy_to_task1(self):
         self.current_strategy = task1.QualityCheckStep1(self.log_signal.emit,self.result_signal.emit,self._user_input)
-        self.log_signal.emit(f"已切换工作模式: {task1.QualityCheckStep1.__annotations__}")
+        self.log_signal.emit(f"已切换工作模式: {task1.QualityCheckStep1.__doc__}")
+        self._reinit_requested = True
+
+    def change_strategy_to_task2(self):
+        self.current_strategy = task2.QualityCheckStep2(self.log_signal.emit,self.result_signal.emit,self._user_input)
+        self.log_signal.emit(f"已切换工作模式: {task2.QualityCheckStep2.__doc__}")
         self._reinit_requested = True

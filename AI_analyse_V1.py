@@ -28,17 +28,18 @@ doubao_client = OpenAI(
 # Google GenAI 客户端
 google_client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
 
-# ====================== 3. 通用审核调用核心类 ======================
-class Reviewer:
+# ====================== 3. 通用调用核心类 ======================
+class Analyser:
     def __init__(self):
         # 客户端映射：key=选择编号，value=(名称, 通用调用函数)
         self.client_map = {
             "1": ("DeepSeek", self._call_deepseek),
             "2": ("doubao", self._call_doubao),
             "3": ("Google Gemini", self._call_google),
+            "4": ("Qwen", self._call_qwen)
         }
 
-    def select_reviewer_client(self, num: str):
+    def select_analyser_client(self, num: str):
         # 循环校验输入
         while True:
             choice = num
@@ -46,11 +47,9 @@ class Reviewer:
                 name, call_func = self.client_map[choice]
                 print(f"已选择 {name} 作为审核客户端。")
                 return call_func
-            if choice == "0":
-                print(f"退出审核系统。")
-                exit(0)
             else:
-                print(f"输入错误")
+                print(f"输入错误，默认选择3")
+                return self._call_google
 
     def _call_deepseek(self, content: str) :
         """封装DeepSeek调用 + 结果解析"""
@@ -89,20 +88,22 @@ class Reviewer:
         )
         # 解析Gemini返回文本
         return response.text
+    
+    def _call_qwen(self, content: str):
+        """封装Qwen调用 + 结果解析"""
+        response = qwen_client.chat.completions.create(
+            model="qwen3-vl-flash",
+            messages=[{"role": "user", "content": content}],
+            stream=False,
+        )
+        # 解析Qwen返回文本
+        return(response.choices[0].message.content)
 
-    def review_analyser(self, content: str, num: str) -> str:
+    def call_analyser(self, content: str, num: str) -> str:
         """通用审核入口：一键调用，自动适配所有客户端"""
-        call_func = self.select_reviewer_client(num)
+        call_func = self.select_analyser_client(num)
         try:
             result = call_func(content)
             return result
         except Exception as e:
             return ""
-
-# ====================== 4. 测试 ======================
-if __name__ == "__main__":
-    reviewer = Reviewer()
-    # 测试审核（替换为你的实际内容）
-    
-    # for t1,t2 in reviewer.client_map.items():
-    #     print(f"{t1}{t2[0]}")

@@ -10,7 +10,6 @@ from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtGui import QColor
 
 from automation_worker import AutomationWorker
-import task1
 
 # ==========================================
 # GUI 主窗口
@@ -106,10 +105,12 @@ class MainWindow(QMainWindow):
         self.btn1 = QPushButton("重置连接")
         self.btn2 = QPushButton("重选API")
         self.btn3 = QPushButton("TASK#1")
+        self.btn4 = QPushButton("TASK#2")
 
         button_layout.addWidget(self.btn1)
         button_layout.addWidget(self.btn2)
         button_layout.addWidget(self.btn3)
+        button_layout.addWidget(self.btn4)
 
         # 将按钮布局添加到主垂直布局的最下方
         layout.addLayout(button_layout)
@@ -117,6 +118,7 @@ class MainWindow(QMainWindow):
         self.btn1.clicked.connect(self.worker.request_reinit)
         self.btn2.clicked.connect(self.worker.request_rechooseAPI)
         self.btn3.clicked.connect(self.worker.request_change_strategy_to_task1)
+        self.btn4.clicked.connect(self.worker.request_change_strategy_to_task2)
 
     # 简单的处理函数
     def handle_button_click(self, value):
@@ -127,7 +129,7 @@ class MainWindow(QMainWindow):
         """接收输入请求并显示对话框"""
         while True:
             text, ok = QInputDialog.getText(self, "用户输入", prompt)
-            if ok and text in self.worker.reviewer.client_map:
+            if ok and text in self.worker.analyser.client_map:
                 self.worker.client_receive_input(text)
                 break
             else: 
