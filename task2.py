@@ -8,7 +8,7 @@ import json
 
 
 class QualityCheckStep2():
-    """收尾逻辑"""
+    """修题逻辑"""
 
     # 根据题目与解答：
     # 1. 审查解答【手动修改】

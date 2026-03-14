@@ -65,8 +65,8 @@ class AutomationWorker(QThread):
         self.log_signal.emit(f"***※务必等待 当前自动化过程执行完成 之后再按下其他按钮※***")
         self.log_signal.emit(f"***※务必等待 当前自动化过程执行完成 之后再按下其他按钮※***")
         self.log_signal.emit(f'=' * 20)
-        self.log_signal.emit(f"TASK#1: 审题逻辑")
-        self.log_signal.emit(f"TASK#2: 收尾逻辑")
+        self.log_signal.emit(f"TASK#1: {task1.QualityCheckStep1.__doc__}")
+        self.log_signal.emit(f"TASK#2: {task2.QualityCheckStep2.__doc__}")
 
         keyboard.add_hotkey(self.hotkey, self._hotkey_callback)
         keyboard.add_hotkey(self.save_hotkey, self._save_hotkey_callback)
