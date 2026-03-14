@@ -153,10 +153,13 @@ class MainWindow(QMainWindow):
             'tables', 
         ]
         
-        rendered_md = markdown.markdown(
-            markdown_text,
-            extensions=md_extensions,
-        )
+        try:
+            rendered_md = markdown.markdown(
+                markdown_text,
+                extensions=md_extensions,
+            )
+        except Exception as e:
+            rendered_md = f"<p>Markdown 解析失败: {e}</p><pre>{markdown_text}</pre>"
         
         html_content = f"""
             <!DOCTYPE html>

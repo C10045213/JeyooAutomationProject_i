@@ -53,11 +53,13 @@ class QualityCheckStep2():
             else: return ''
             
             # 于此删除本地图片
-            os.remove(choices_path)
+            if os.path.exists(choices_path):
+                os.remove(choices_path)
             return choices_base64
         
         except Exception as e:
-            self.log(f"文件读取错误: {e}")    
+            self.log(f"文件读取或删除错误: {e}")    
+            return ""
 
     def execute(self):
 
@@ -101,8 +103,13 @@ class QualityCheckStep2():
         # 根据特定格式返回文本，尝试填写表单
         self.log(f"5. 正在改写表单...")
         if ai_output != "":
-            ai_output = self.formatize_ai_output2json(ai_output)
-            self.fill_forms(self.page_1, json.loads(ai_output))
+            try:
+                ai_output_formatted = self.formatize_ai_output2json(ai_output)
+                parsed_json = json.loads(ai_output_formatted)
+                self.fill_forms(self.page_1, parsed_json)
+            except Exception as e:
+                self.log(f"解析 JSON 或改写表单失败: {e}")
+                print(f"解析JSON错误，原始输出: {ai_output}")
         
 
     def choices_screenshot(self, operator_page: Page):

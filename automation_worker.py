@@ -82,7 +82,12 @@ class AutomationWorker(QThread):
             if self._task_requested:
                 self._task_requested = False
                 if self.current_strategy:
-                    self.current_strategy.execute() # Task的execute函数名需统一
+                    try:
+                        self.current_strategy.execute() # Task的execute函数名需统一
+                    except Exception as e:
+                        self.log_signal.emit(f"任务执行异常: {e}")
+                        print(f"任务执行异常: {e}")
+                    
                     self.save_event.clear()
 
                     # TASK#2专用
@@ -93,8 +98,13 @@ class AutomationWorker(QThread):
                         self.save_event.wait(timeout=30)
                         if self._save_task_requested:
                             self._save_task_requested = False
-                            self.current_strategy.saven_next()
-                            self.log_signal.emit(f"本次任务已完成。")
+                            try:
+                                self.current_strategy.saven_next()
+                                self.log_signal.emit(f"本次任务已完成。")
+                            except Exception as e:
+                                self.log_signal.emit(f"保存与翻页执行异常: {e}")
+                                print(f"保存与翻页执行异常: {e}")
+                            
                             self.log_signal.emit('='*30)
                             self.save_event.clear()
                         else:

@@ -106,4 +106,5 @@ class Analyser:
             result = call_func(content)
             return result
         except Exception as e:
-            return ""
+            print(f"API调用失败: {e}")
+            return f"Error: API调用失败 - {e}"

@@ -49,10 +49,12 @@ class QualityCheckStep1():
         self.log("3. 调用多模态LLM进行 OCR...")
         
         # ... Base64编码 ...
+        problem_base64 = ""
+        choices_base64 = ""
         try:
             with open(problem_path, "rb") as f:
                 problem_base64 = base64.b64encode(f.read()).decode("utf-8")
-            choices_base64 = ""
+            
             if choices_path:
                 with open(choices_path, "rb") as f:
                     choices_base64 = base64.b64encode(f.read()).decode("utf-8")
@@ -60,9 +62,13 @@ class QualityCheckStep1():
             self.log(f"文件读取错误: {e}")
         
         # 于此删除本地图片
-        os.remove(problem_path)
-        if choices_path:
-            os.remove(choices_path)
+        try:
+            if os.path.exists(problem_path):
+                os.remove(problem_path)
+            if choices_path and os.path.exists(choices_path):
+                os.remove(choices_path)
+        except Exception as e:
+            self.log(f"清理截图文件失败: {e}")
 
         # 构造消息
         content_payload = []
