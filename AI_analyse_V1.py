@@ -45,7 +45,7 @@ class Analyser:
             choice = num
             if choice in self.client_map:
                 name, call_func = self.client_map[choice]
-                print(f"已选择 {name} 作为审核客户端。")
+                print(f"已选择 {name} 作为客户端。")
                 return call_func
             else:
                 print(f"输入错误，默认选择3")

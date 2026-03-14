@@ -71,18 +71,7 @@ class QualityCheckStep1():
         if choices_path:
             content_payload.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{choices_base64}"}})
 
-        problem_response = analyser.qwen_client.chat.completions.create(
-            model="qwen3-vl-flash",
-            messages=[{"role": "user", "content": content_payload}],
-            stream=True,
-            stream_options={"include_usage": True},
-        )
-
-        for chunk in problem_response:
-            if chunk.choices:
-                delta = chunk.choices[0].delta
-                if delta and delta.content:
-                    problem_alltext += delta.content
+        problem_alltext = self.analyser.call_analyser(content_payload, '4') 
         print(problem_alltext)
 
         # 3. 审核 
@@ -96,7 +85,7 @@ class QualityCheckStep1():
         self.result(ai_output)
         
         self.log(f"本次任务已完成。")
-        self.log('='*20)
+        self.log('='*30)
 
     def problem_screenshot(self, operator_page):
         '''依靠特定页面元素定位，对题目进行截图'''

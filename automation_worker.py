@@ -1,5 +1,6 @@
 import keyboard
 import time
+import threading
 from PyQt6.QtCore import QThread, pyqtSignal, QEventLoop
 from AI_analyse_V1 import Analyser
 from broswer_manager import BrowserManager
@@ -16,6 +17,8 @@ class AutomationWorker(QThread):
         super().__init__()
         self.running = True
         self.hotkey = 'ctrl+alt+z' # 于此确认设置HOTKEY
+        self.save_hotkey = 'ctrl+alt+x' # 于此设置任务2存储专用HOTKEY
+        self.save_event = threading.Event()
         self.analyser = Analyser()
         
         # 标志位
@@ -24,6 +27,9 @@ class AutomationWorker(QThread):
         self._rechooseAPI_requested = False
         self._requested_change_to_task1 = False
         self._requested_change_to_task2 = False
+        self._task1_flag = False
+        self._task2_flag = False
+        self._save_task_requested = False
         
         # Playwright
         self.browser_manager = BrowserManager(self.log_signal.emit)
@@ -45,15 +51,25 @@ class AutomationWorker(QThread):
     def _hotkey_callback(self):
         self._task_requested = True
 
+    def _save_hotkey_callback(self):
+        self._save_task_requested = True
+        self.save_event.set()
+
     def request_rechooseAPI(self):
         self._rechooseAPI_requested = True  
 
     def run(self):
         self.log_signal.emit(f'=' * 20)
         self.log_signal.emit(f"启动快捷键预设为：{self.hotkey} ")
+        self.log_signal.emit(f"***※务必等待 当前自动化过程执行完成 之后再按下其他按钮※***")
+        self.log_signal.emit(f"***※务必等待 当前自动化过程执行完成 之后再按下其他按钮※***")
+        self.log_signal.emit(f"***※务必等待 当前自动化过程执行完成 之后再按下其他按钮※***")
         self.log_signal.emit(f'=' * 20)
+        self.log_signal.emit(f"TASK#1: 审题逻辑")
+        self.log_signal.emit(f"TASK#2: 收尾逻辑")
 
         keyboard.add_hotkey(self.hotkey, self._hotkey_callback)
+        keyboard.add_hotkey(self.save_hotkey, self._save_hotkey_callback)
         self._rechooseAPI_requested = True 
 
         while self.running:
@@ -67,8 +83,27 @@ class AutomationWorker(QThread):
                 self._task_requested = False
                 if self.current_strategy:
                     self.current_strategy.execute() # Task的execute函数名需统一
+                    self.save_event.clear()
+
+                    # TASK#2专用
+                    if self._task2_flag:
+                        self.log_signal.emit(f"按下: {self.save_hotkey} 以执行保存与翻页")
+                        self.save_event.clear()
+                        self._save_task_requested = False
+                        self.save_event.wait(timeout=30)
+                        if self._save_task_requested:
+                            self._save_task_requested = False
+                            self.current_strategy.saven_next()
+                            self.log_signal.emit(f"本次任务已完成。")
+                            self.log_signal.emit('='*30)
+                            self.save_event.clear()
+                        else:
+                            self.log_signal.emit(f"等待超时，本次任务已终止。")
+                            self.log_signal.emit('='*30)
+                            self.save_event.clear()
+
                 else:
-                    self.log_signal.emit("未设置任务策略！")
+                    self.log_signal.emit(f"未设置任务策略！")
 
             # 3. 处理重选API
             if self._rechooseAPI_requested:
@@ -79,10 +114,14 @@ class AutomationWorker(QThread):
             if self._requested_change_to_task1:
                 self._requested_change_to_task1 = False
                 self.change_strategy_to_task1()
+                self._task2_flag = False
+                self._task1_flag = True
             
             if self._requested_change_to_task2:
                 self._requested_change_to_task2 = False
                 self.change_strategy_to_task2()
+                self._task1_flag = False
+                self._task2_flag = True
 
             # 5. 处理弹窗
             self.check_pages_ondialog()
@@ -151,3 +190,6 @@ class AutomationWorker(QThread):
         self.current_strategy = task2.QualityCheckStep2(self.log_signal.emit,self.result_signal.emit,self._user_input)
         self.log_signal.emit(f"已切换工作模式: {task2.QualityCheckStep2.__doc__}")
         self._reinit_requested = True
+
+
+
