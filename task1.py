@@ -2,13 +2,15 @@ import AI_analyse_V1 as analyser
 import os
 import pyperclip
 import base64
+import threading
 
 class QualityCheckStep1():
     """审题逻辑"""
 
-    def __init__(self, log_callback, result_callback, input_num_for_AI: str):    
+    def __init__(self, log_callback, result_callback, input_num_for_AI: str, stop_signal: threading.Event):    
         self.log = log_callback
         self.result = result_callback
+        self.stop = stop_signal
         self.analyser = analyser.Analyser()
         self._user_input = input_num_for_AI
         self.page_1 = None
@@ -31,67 +33,69 @@ class QualityCheckStep1():
 
     def execute(self):
 
-        self.log("\n>>> 开始执行任务...")
-        problem_alltext = ""
+        while not self.stop.is_set():
+            self.log("\n>>> 开始执行任务...")
+            problem_alltext = ""
 
-        # 1. 截图
-        self.log("1. 正在截图题目...")
-        imgs = self.problem_screenshot(self.page_1)
-        if imgs == None : 
-            self.log(f"！！！截图失败！！！")
-            return
-        (choices_path, problem_path) = imgs
+            # 1. 截图
+            self.log("1. 正在截图题目...")
+            imgs = self.problem_screenshot(self.page_1)
+            if imgs == None : 
+                self.log(f"！！！截图失败！！！")
+                return
+            (choices_path, problem_path) = imgs
 
-        self.log("2. 正在获取答案...")
-        answer = self.jump_and_search_copy_and_return(self.page_1, self.page_2)
+            self.log("2. 正在获取答案...")
+            answer = self.jump_and_search_copy_and_return(self.page_1, self.page_2)
 
-        # 2. OCR (Qwen)
-        self.log("3. 调用多模态LLM进行 OCR...")
-        
-        # ... Base64编码 ...
-        problem_base64 = ""
-        choices_base64 = ""
-        try:
-            with open(problem_path, "rb") as f:
-                problem_base64 = base64.b64encode(f.read()).decode("utf-8")
+            # 2. OCR (Qwen)
+            self.log("3. 调用多模态LLM进行 OCR...")
             
+            # ... Base64编码 ...
+            problem_base64 = ""
+            choices_base64 = ""
+            try:
+                with open(problem_path, "rb") as f:
+                    problem_base64 = base64.b64encode(f.read()).decode("utf-8")
+                
+                if choices_path:
+                    with open(choices_path, "rb") as f:
+                        choices_base64 = base64.b64encode(f.read()).decode("utf-8")
+            except Exception as e:
+                self.log(f"文件读取错误: {e}")
+            
+            # 于此删除本地图片
+            try:
+                if os.path.exists(problem_path):
+                    os.remove(problem_path)
+                if choices_path and os.path.exists(choices_path):
+                    os.remove(choices_path)
+            except Exception as e:
+                self.log(f"清理截图文件失败: {e}")
+
+            # 构造消息
+            content_payload = []
+            content_payload.append({"type": "text", "text": "用latex源码仅输出图片识别内容。"})
+            content_payload.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{problem_base64}"}})
             if choices_path:
-                with open(choices_path, "rb") as f:
-                    choices_base64 = base64.b64encode(f.read()).decode("utf-8")
-        except Exception as e:
-            self.log(f"文件读取错误: {e}")
-        
-        # 于此删除本地图片
-        try:
-            if os.path.exists(problem_path):
-                os.remove(problem_path)
-            if choices_path and os.path.exists(choices_path):
-                os.remove(choices_path)
-        except Exception as e:
-            self.log(f"清理截图文件失败: {e}")
+                content_payload.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{choices_base64}"}})
 
-        # 构造消息
-        content_payload = []
-        content_payload.append({"type": "text", "text": "用latex源码仅输出图片识别内容。"})
-        content_payload.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{problem_base64}"}})
-        if choices_path:
-            content_payload.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{choices_base64}"}})
+            problem_alltext = self.analyser.call_analyser(content_payload, '4') 
+            print(problem_alltext)
 
-        problem_alltext = self.analyser.call_analyser(content_payload, '4') 
-        print(problem_alltext)
-
-        # 3. 审核 
-        self.log("4. 提交与 AI 审核...")
-        final_result = self.analyze_answer(problem_alltext, answer, self._user_input)
-        ai_output = ""
-        ai_output = final_result
-        self.log(f">>> 审核结果已返回")
-        
-        # 发送结果到 GUI 进行渲染
-        self.result(ai_output)
-        
-        self.log(f"本次任务已完成。")
-        self.log('='*30)
+            # 3. 审核 
+            self.log("4. 提交与 AI 审核...")
+            final_result = self.analyze_answer(problem_alltext, answer, self._user_input)
+            ai_output = ""
+            ai_output = final_result
+            self.log(f">>> 审核结果已返回")
+            
+            # 发送结果到 GUI 进行渲染
+            self.result(ai_output)
+            
+            self.log(f"本次任务已完成。")
+            self.log('='*30)
+            break
 
     def problem_screenshot(self, operator_page):
         '''依靠特定页面元素定位，对题目进行截图'''

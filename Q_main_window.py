@@ -4,7 +4,7 @@ import markdown
 
 # PyQt6 导入
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,  QPushButton,
-                              QTextEdit, QSplitter, QLabel, QInputDialog)
+                              QTextEdit, QSplitter, QLabel, QInputDialog, QMessageBox)
 from PyQt6.QtCore import Qt, pyqtSignal, QObject
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtGui import QColor
@@ -95,6 +95,7 @@ class MainWindow(QMainWindow):
         self.worker.log_signal.connect(self.update_log)
         self.worker.result_signal.connect(self.render_markdown)
         self.worker.input_signal.connect(self.receive_input)
+        self.worker.critical_signal.connect(self.msg_critical)
         self.worker.start()
 
         # --- 新增部分：底部按钮区域 ---
@@ -138,6 +139,9 @@ class MainWindow(QMainWindow):
 
     def update_log(self, text):
         self.console_output.append(text.strip())
+
+    def msg_critical(self):
+        QMessageBox(self, "任务已终止", "异常，详见终端日志。")
 
     def render_markdown(self, markdown_text):
         def texreplace(text):

@@ -11,14 +11,15 @@ class AutomationWorker(QThread):
     
     log_signal = pyqtSignal(str)      
     result_signal = pyqtSignal(str)   
-    input_signal = pyqtSignal(str)    
+    input_signal = pyqtSignal(str)
+    critical_signal = pyqtSignal(str)  
 
     def __init__(self):
         super().__init__()
         self.running = True
         self.hotkey = 'ctrl+alt+z' # 于此确认设置HOTKEY
-        self.save_hotkey = 'ctrl+alt+x' # 于此设置任务2存储专用HOTKEY
-        self.save_event = threading.Event()
+        # self.save_hotkey = 'ctrl+alt+x' # 于此设置任务2存储专用HOTKEY
+        self.stop_hotkey = 'ctrl+alt+d' # 于此设置任务2的停止HOTKEY
         self.analyser = Analyser()
         
         # 标志位
@@ -35,8 +36,11 @@ class AutomationWorker(QThread):
         self.browser_manager = BrowserManager(self.log_signal.emit)
         self.pages = None
         
-        # 当前执行的策略
+        # 当前执行的策略与线程控制
         self.current_strategy = 0
+        self.method_thread = None
+        self.stop_signal = threading.Event()
+        # self.save_event = threading.Event() #TASK#2题目直答等待确认线程控制（或将作为TASK#3）
 
     def request_change_strategy_to_task1(self):
         self._requested_change_to_task1 = True
@@ -51,9 +55,13 @@ class AutomationWorker(QThread):
     def _hotkey_callback(self):
         self._task_requested = True
 
-    def _save_hotkey_callback(self):
-        self._save_task_requested = True
-        self.save_event.set()
+    # TASK#2直答专用快捷键
+    # def _save_hotkey_callback(self):
+    #     self._save_task_requested = True
+    #     self.save_event.set()
+
+    def _halt_callback(self):
+        self._halt_requested = True
 
     def request_rechooseAPI(self):
         self._rechooseAPI_requested = True  
@@ -61,15 +69,18 @@ class AutomationWorker(QThread):
     def run(self):
         self.log_signal.emit(f'=' * 20)
         self.log_signal.emit(f"启动快捷键预设为：{self.hotkey} ")
-        self.log_signal.emit(f"***※务必等待 当前自动化过程执行完成 之后再按下其他按钮※***")
-        self.log_signal.emit(f"***※务必等待 当前自动化过程执行完成 之后再按下其他按钮※***")
-        self.log_signal.emit(f"***※务必等待 当前自动化过程执行完成 之后再按下其他按钮※***")
+        self.log_signal.emit(f"终止快捷键预设为：{self.stop_hotkey} ")
+        self.log_signal.emit(f"***※务必等待 当前自动化过程已终止 之后再按下其他按钮※***")
+        self.log_signal.emit(f"***※务必等待 当前自动化过程已终止 之后再按下其他按钮※***")
+        self.log_signal.emit(f"***※务必等待 当前自动化过程已终止 之后再按下其他按钮※***")
         self.log_signal.emit(f'=' * 20)
         self.log_signal.emit(f"TASK#1: {task1.QualityCheckStep1.__doc__}")
         self.log_signal.emit(f"TASK#2: {task2.QualityCheckStep2.__doc__}")
 
         keyboard.add_hotkey(self.hotkey, self._hotkey_callback)
-        keyboard.add_hotkey(self.save_hotkey, self._save_hotkey_callback)
+        # TASK#2直答专用快捷键
+        # keyboard.add_hotkey(self.save_hotkey, self._save_hotkey_callback)
+        keyboard.add_hotkey(self.hotkey, self._hault_callback)
         self._rechooseAPI_requested = True 
 
         while self.running:
@@ -83,34 +94,35 @@ class AutomationWorker(QThread):
                 self._task_requested = False
                 if self.current_strategy:
                     try:
-                        self.current_strategy.execute() # Task的execute函数名需统一
+                        self.method_thread = threading.Thread(target=self.current_strategy.execute())
+                        self.method_thread.start() # Task的execute函数名需统一
                     except Exception as e:
                         self.log_signal.emit(f"任务执行异常: {e}")
                         print(f"任务执行异常: {e}")
                     
-                    self.save_event.clear()
+                    # self.save_event.clear()
 
-                    # TASK#2专用
-                    if self._task2_flag:
-                        self.log_signal.emit(f"按下: {self.save_hotkey} 以执行保存与翻页")
-                        self.save_event.clear()
-                        self._save_task_requested = False
-                        self.save_event.wait(timeout=30)
-                        if self._save_task_requested:
-                            self._save_task_requested = False
-                            try:
-                                self.current_strategy.saven_next()
-                                self.log_signal.emit(f"本次任务已完成。")
-                            except Exception as e:
-                                self.log_signal.emit(f"保存与翻页执行异常: {e}")
-                                print(f"保存与翻页执行异常: {e}")
+                    # TASK#2 直答专用
+                    # if self._task2_flag:
+                    #     self.log_signal.emit(f"按下: {self.save_hotkey} 以执行保存与翻页")
+                    #     self.save_event.clear()
+                    #     self._save_task_requested = False
+                    #     self.save_event.wait(timeout=30)
+                    #     if self._save_task_requested:
+                    #         self._save_task_requested = False
+                    #         try:
+                    #             self.current_strategy.saven_next()
+                    #             self.log_signal.emit(f"本次任务已完成。")
+                    #         except Exception as e:
+                    #             self.log_signal.emit(f"保存与翻页执行异常: {e}")
+                    #             print(f"保存与翻页执行异常: {e}")
                             
-                            self.log_signal.emit('='*30)
-                            self.save_event.clear()
-                        else:
-                            self.log_signal.emit(f"等待超时，本次任务已终止。")
-                            self.log_signal.emit('='*30)
-                            self.save_event.clear()
+                    #         self.log_signal.emit('='*30)
+                    #         self.save_event.clear()
+                    #     else:
+                    #         self.log_signal.emit(f"等待超时，本次任务已终止。")
+                    #         self.log_signal.emit('='*30)
+                    #         self.save_event.clear()
 
                 else:
                     self.log_signal.emit(f"未设置任务策略！")
@@ -135,6 +147,14 @@ class AutomationWorker(QThread):
 
             # 5. 处理弹窗
             self.check_pages_ondialog()
+
+            # 6. 处理终止
+            if self._halt_requested:
+                self._halt_requested = False
+                self.stop_signal.set()
+                self.method_thread.join()
+                self.log_signal.emit(f"***※已终止※***")
+                self.log_signal.clear()
 
             time.sleep(0.1)
             
@@ -192,12 +212,12 @@ class AutomationWorker(QThread):
 
     # 切换任务
     def change_strategy_to_task1(self):
-        self.current_strategy = task1.QualityCheckStep1(self.log_signal.emit,self.result_signal.emit,self._user_input)
+        self.current_strategy = task1.QualityCheckStep1(self.log_signal.emit,self.result_signal.emit,self._user_input, self.stop_signal)
         self.log_signal.emit(f"已切换工作模式: {task1.QualityCheckStep1.__doc__}")
         self._reinit_requested = True
 
     def change_strategy_to_task2(self):
-        self.current_strategy = task2.QualityCheckStep2(self.log_signal.emit,self.result_signal.emit,self._user_input)
+        self.current_strategy = task2.QualityCheckStep2(self.log_signal.emit,self.result_signal.emit,self.critical_signal,self._user_input, self.stop_signal)
         self.log_signal.emit(f"已切换工作模式: {task2.QualityCheckStep2.__doc__}")
         self._reinit_requested = True
 

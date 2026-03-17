@@ -5,6 +5,8 @@ import base64
 import re
 from playwright.sync_api import Page
 import json
+import time
+import threading
 
 
 class QualityCheckStep2():
@@ -15,9 +17,11 @@ class QualityCheckStep2():
     # 2. 审查考点【手动修改】
     # 3. 以源码格式输出分析与点评【自动输入】
 
-    def __init__(self, log_callback, result_callback, input_num_for_AI: str):    
+    def __init__(self, log_callback, result_callback, alert_callback, input_num_for_AI: str, stop_signal: threading.Event):    
         self.log = log_callback
         self.result_log = result_callback
+        self.alert = alert_callback
+        self.stop = stop_signal
         self.analyser = analyser.Analyser()
         self._user_input = input_num_for_AI
 
@@ -63,53 +67,75 @@ class QualityCheckStep2():
 
     def execute(self):
 
-        self.log("\n>>> 开始执行任务...")
-        problem_alltext = ""
+        while not self.stop.is_set():
+            self.log("\n>>> 开始执行任务...")
+            start_time = time.perf_counter()
 
-        # 1. 截图
-        self.log("1. 正在截图题目...")
-        imgs = self.choices_screenshot(self.page_1)
-        if imgs == None : 
-            self.log(f"！！！截图失败！！！")
-            return
+            # 1. 截图
+            self.log("1. 正在截图题目...")
+            imgs = self.choices_screenshot(self.page_1)
+            if imgs == None : 
+                self.log(f"！！！截图失败！！！")
+                return
 
-        self.log("2. 正在获取题目、答案、考点...")
-        answer = self.copy_answer(self.page_1)
-        keypoint = self.copy_keypoint(self.page_1)
-        problem = self.copy_problem(self.page_1)
-        # analysis = self.copy_analysis(self.page_1)
-        # discuss = self.copy_discuss(self.page_1)
+            self.log("2. 正在获取题目、答案、考点...")
+            answer = self.copy_answer(self.page_1)
+            keypoint = self.copy_keypoint(self.page_1)
+            problem = self.copy_problem(self.page_1)
+            # analysis = self.copy_analysis(self.page_1)
+            # discuss = self.copy_discuss(self.page_1)
 
 
-        # 构造识题消息
-        choices_pic64 = self.encodebase64(imgs)
-        choices_alltext = ''
-        if choices_pic64 != '':
-            self.log("3. 调用多模态LLM进行题目OCR...")
-            content_payload = []
-            content_payload.append({"type": "text", "text": "用latex源码仅输出图片识别内容。"})
-            content_payload.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{choices_pic64}"}})
-            choices_alltext = self.analyser.call_analyser(content_payload, '4') 
-            print(choices_alltext)
+            # 构造识题消息
+            choices_pic64 = self.encodebase64(imgs)
+            choices_alltext = ''
+            if choices_pic64 != '':
+                self.log("3. 调用多模态LLM进行题目OCR...")
+                content_payload = []
+                content_payload.append({"type": "text", "text": "用latex源码仅输出图片识别内容。"})
+                content_payload.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{choices_pic64}"}})
+                choices_alltext = self.analyser.call_analyser(content_payload, '4') 
+                print(choices_alltext)
 
-        # 3. 审核 
-        self.log("4. 提交与 AI 审核...")
-        ai_output = self.analyze_answer(problem, choices_alltext, answer, keypoint, self._user_input)
-        self.log(f">>> 审核结果已返回")
-        
-        # 发送结果到 GUI 进行渲染
-        self.result_log(ai_output)
+            # 3. 审核 
+            self.log("4. 提交与 AI 审核...")
+            ai_output = self.analyze_answer(problem, choices_alltext, answer, keypoint, self._user_input)
+            self.log(f">>> 审核结果已返回")
+            
+            # 发送结果到 GUI 进行渲染
+            self.result_log(ai_output)
 
-        # 根据特定格式返回文本，尝试填写表单
-        self.log(f"5. 正在改写表单...")
-        if ai_output != "":
-            try:
-                ai_output_formatted = self.formatize_ai_output2json(ai_output)
-                parsed_json = json.loads(ai_output_formatted)
-                self.fill_forms(self.page_1, parsed_json)
-            except Exception as e:
-                self.log(f"解析 JSON 或改写表单失败: {e}")
-                print(f"解析JSON错误，原始输出: {ai_output}")
+            # 根据特定格式返回文本，尝试填写表单
+            self.log(f"5. 正在改写表单...")
+            if ai_output != "":
+                try:
+                    ai_output_formatted = self.formatize_ai_output2json(ai_output)
+                    parsed_json = json.loads(ai_output_formatted)
+                    self.fill_forms(self.page_1, parsed_json)
+                    if parsed_json["problem"]["s"] == '0':
+                        self.log(f"**题目**有误, 请参照msg修改或检查ocr。")
+
+                    if parsed_json["keypoint"]["s"] == '0':
+                        self.log(f"**考点**有误, 请参照msg修改。")
+
+                    if parsed_json["answer"]["s"] == '0':
+                        self.log(f"**解答**有误, 请参照msg修改。")
+
+                    if parsed_json["problem"]["s"] == '0' | parsed_json["keypoint"]["s"] == '0' | parsed_json["answer"]["s"] == '0' :
+                        self.alert()
+                        break
+                    self.saven_next()
+                except Exception as e:
+                    self.log(f"解析 JSON 或改写表单失败: {e}")
+                    print(f"解析JSON错误, 原始输出: {ai_output}")
+
+            
+            self.log(f"本次任务已完成。")
+            end_time = time.perf_counter()
+            self.log(f"本次任务耗时：{end_time-start_time:.2f}秒")
+            self.log(f"=" * 30)
+
+            time.sleep(0.1)
         
 
     def choices_screenshot(self, operator_page: Page):
@@ -300,7 +326,6 @@ class QualityCheckStep2():
             return
             
     def saven_next(self):
-        '''危险函数，必须经由信号触发'''
         try:
             self.page_1.locator("button:nth-child(1)").click()
             self.page_1.locator(".tablebar:nth-child(6) .tedit:nth-child(4)").click()
