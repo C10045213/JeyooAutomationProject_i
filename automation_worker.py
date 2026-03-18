@@ -60,8 +60,11 @@ class AutomationWorker(QThread):
     #     self._save_task_requested = True
     #     self.save_event.set()
 
-    def _halt_callback(self):
-        self._halt_requested = True
+    # 处理终止
+    def halt(self):
+        self.log_signal.emit(f"已发出终止指令。")
+        self.stop_signal.set()
+        self.log_signal.emit(f"***※已终止※***")
 
     def request_rechooseAPI(self):
         self._rechooseAPI_requested = True  
@@ -80,7 +83,7 @@ class AutomationWorker(QThread):
         keyboard.add_hotkey(self.hotkey, self._hotkey_callback)
         # TASK#2直答专用快捷键
         # keyboard.add_hotkey(self.save_hotkey, self._save_hotkey_callback)
-        keyboard.add_hotkey(self.hotkey, self._hault_callback)
+        keyboard.add_hotkey(self.stop_hotkey, self.halt)
         self._rechooseAPI_requested = True 
 
         while self.running:
@@ -94,8 +97,8 @@ class AutomationWorker(QThread):
                 self._task_requested = False
                 if self.current_strategy:
                     try:
-                        self.method_thread = threading.Thread(target=self.current_strategy.execute())
-                        self.method_thread.start() # Task的execute函数名需统一
+                        self.stop_signal.clear()
+                        self.current_strategy.execute()
                     except Exception as e:
                         self.log_signal.emit(f"任务执行异常: {e}")
                         print(f"任务执行异常: {e}")
@@ -148,13 +151,7 @@ class AutomationWorker(QThread):
             # 5. 处理弹窗
             self.check_pages_ondialog()
 
-            # 6. 处理终止
-            if self._halt_requested:
-                self._halt_requested = False
-                self.stop_signal.set()
-                self.method_thread.join()
-                self.log_signal.emit(f"***※已终止※***")
-                self.log_signal.clear()
+            # 6. 处理终止（原死锁已修复）
 
             time.sleep(0.1)
             
@@ -217,7 +214,7 @@ class AutomationWorker(QThread):
         self._reinit_requested = True
 
     def change_strategy_to_task2(self):
-        self.current_strategy = task2.QualityCheckStep2(self.log_signal.emit,self.result_signal.emit,self.critical_signal,self._user_input, self.stop_signal)
+        self.current_strategy = task2.QualityCheckStep2(self.log_signal.emit,self.result_signal.emit,self.critical_signal.emit,self._user_input, self.stop_signal)
         self.log_signal.emit(f"已切换工作模式: {task2.QualityCheckStep2.__doc__}")
         self._reinit_requested = True
 

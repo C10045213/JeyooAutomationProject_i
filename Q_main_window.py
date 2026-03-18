@@ -41,16 +41,56 @@ class MainWindow(QMainWindow):
 
         # 样式表 (Dark Mode)
         self.setStyleSheet("""
-            QInputDialog { background-color: #2b2b2b; }
-            QMainWindow { background-color: #2b2b2b; }
+            /* 1. 统一窗口背景 */
+            QMainWindow, QDialog, QMessageBox { 
+                background-color: #2b2b2b; 
+                color: white; 
+            }
+
+            /* 2. 修复文本显示（核心修复） */
+            QLabel { 
+                color: #ffffff; 
+                font-weight: bold; 
+                /* 不要在这里写全局 padding，否则会干扰所有小控件 */
+            }
+
+            /* 3. 专门针对控制台/文本框的样式 */
             QTextEdit { 
                 background-color: #1e1e1e; 
                 color: #00ff00; 
-                font-family: Consolas; 
+                font-family: 'Consolas', 'Courier New', monospace; 
                 font-size: 10pt;
                 border: 1px solid #444;
+                padding: 5px;
             }
-            QLabel { color: white; font-weight: bold; padding: 5px;}
+
+            /* 4. 让对话框里的按钮也变酷一点 */
+            QPushButton {
+                background-color: #444;
+                color: white;
+                border: 1px solid #666;
+                padding: 5px 15px;
+                border-radius: 3px;
+                min-width: 60px;
+            }
+            QPushButton:hover {
+                background-color: #555;
+                border: 1px solid #00ff00; /* 悬停时显示科技绿边框 */
+            }
+            QPushButton:pressed {
+                background-color: #222;
+            }
+
+            /* 5. 针对 QInputDialog 的特殊处理 */
+            QInputDialog {
+                background-color: #2b2b2b;
+            }
+            QLineEdit {
+                background-color: #1e1e1e;
+                color: white;
+                border: 1px solid #444;
+                padding: 3px;
+            }
         """)
 
         # 主布局
@@ -121,11 +161,6 @@ class MainWindow(QMainWindow):
         self.btn3.clicked.connect(self.worker.request_change_strategy_to_task1)
         self.btn4.clicked.connect(self.worker.request_change_strategy_to_task2)
 
-    # 简单的处理函数
-    def handle_button_click(self, value):
-        print(value)  # 在终端打印
-        self.console_output.append(f"按钮按下: {value}") # 在 UI 日志框显示
-
     def receive_input(self, prompt):
         """接收输入请求并显示对话框"""
         while True:
@@ -140,8 +175,8 @@ class MainWindow(QMainWindow):
     def update_log(self, text):
         self.console_output.append(text.strip())
 
-    def msg_critical(self):
-        QMessageBox(self, "任务已终止", "异常，详见终端日志。")
+    def msg_critical(self, text):
+        QMessageBox.critical(self, "终止", text)
 
     def render_markdown(self, markdown_text):
         def texreplace(text):

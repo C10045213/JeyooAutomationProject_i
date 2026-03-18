@@ -113,21 +113,33 @@ class QualityCheckStep2():
                     parsed_json = json.loads(ai_output_formatted)
                     self.fill_forms(self.page_1, parsed_json)
                     if parsed_json["problem"]["s"] == '0':
-                        self.log(f"**题目**有误, 请参照msg修改或检查ocr。")
+                        self.log(f"**题目**有误, 请参照msg修改或检查ocr。")            
+                        self.log(f"本次任务已完成。")
+                        end_time = time.perf_counter()
+                        self.log(f"本次任务耗时：{end_time-start_time:.2f}秒")
+                        self.log(f"=" * 30)
 
                     if parsed_json["keypoint"]["s"] == '0':
-                        self.log(f"**考点**有误, 请参照msg修改。")
+                        self.log(f"**考点**有误, 请参照msg修改。")            
+                        self.log(f"本次任务已完成。")
+                        end_time = time.perf_counter()
+                        self.log(f"本次任务耗时：{end_time-start_time:.2f}秒")
+                        self.log(f"=" * 30)
 
                     if parsed_json["answer"]["s"] == '0':
-                        self.log(f"**解答**有误, 请参照msg修改。")
+                        self.log(f"**解答**有误, 请参照msg修改。")            
+                        self.log(f"本次任务已完成。")
+                        end_time = time.perf_counter()
+                        self.log(f"本次任务耗时：{end_time-start_time:.2f}秒")
+                        self.log(f"=" * 30)
 
-                    if parsed_json["problem"]["s"] == '0' | parsed_json["keypoint"]["s"] == '0' | parsed_json["answer"]["s"] == '0' :
-                        self.alert()
+                    if parsed_json["problem"]["s"] == '0' or parsed_json["keypoint"]["s"] == '0' or parsed_json["answer"]["s"] == '0' :
+                        self.alert("需参考console_log修改")
                         break
                     self.saven_next()
                 except Exception as e:
-                    self.log(f"解析 JSON 或改写表单失败: {e}")
-                    print(f"解析JSON错误, 原始输出: {ai_output}")
+                    self.log(f"解析 JSON 或改写表单或alert失败: {e}")
+                    print(f"异常，原始输出: {ai_output}")
 
             
             self.log(f"本次任务已完成。")
@@ -135,7 +147,9 @@ class QualityCheckStep2():
             self.log(f"本次任务耗时：{end_time-start_time:.2f}秒")
             self.log(f"=" * 30)
 
-            time.sleep(0.1)
+            self.stop.wait(5)
+            if self.stop.is_set():
+                break
         
 
     def choices_screenshot(self, operator_page: Page):
