@@ -66,24 +66,32 @@ class QualityCheckStep2():
             return ""
 
     def execute(self):
-
-        while not self.stop.is_set():
+        
+        # 先保存当前页修改
+        self.save()
+        while not self.stop.is_set():  
+                
             self.log("\n>>> 开始执行任务...")
             start_time = time.perf_counter()
 
             # 1. 截图
-            self.log("1. 正在截图题目...")
             imgs = self.choices_screenshot(self.page_1)
             if imgs == None : 
-                self.log(f"！！！截图失败！！！")
+                self.log(f"***※截图失败※***")
                 return
 
             self.log("2. 正在获取题目、答案、考点...")
             answer = self.copy_answer(self.page_1)
             keypoint = self.copy_keypoint(self.page_1)
             problem = self.copy_problem(self.page_1)
+            
+            # 跳过已经写入分析/点评的题目
             # analysis = self.copy_analysis(self.page_1)
-            # discuss = self.copy_discuss(self.page_1)
+            discuss = self.copy_discuss(self.page_1)
+            if "略" not in discuss:
+                self.next()
+                self.log(f">>>此题跳过")
+                continue
 
 
             # 构造识题消息
@@ -104,6 +112,7 @@ class QualityCheckStep2():
             
             # 发送结果到 GUI 进行渲染
             self.result_log(ai_output)
+            print(ai_output)
 
             # 根据特定格式返回文本，尝试填写表单
             self.log(f"5. 正在改写表单...")
@@ -114,29 +123,22 @@ class QualityCheckStep2():
                     self.fill_forms(self.page_1, parsed_json)
                     if parsed_json["problem"]["s"] == '0':
                         self.log(f"**题目**有误, 请参照msg修改或检查ocr。")            
-                        self.log(f"本次任务已完成。")
-                        end_time = time.perf_counter()
-                        self.log(f"本次任务耗时：{end_time-start_time:.2f}秒")
-                        self.log(f"=" * 30)
 
                     if parsed_json["keypoint"]["s"] == '0':
                         self.log(f"**考点**有误, 请参照msg修改。")            
-                        self.log(f"本次任务已完成。")
-                        end_time = time.perf_counter()
-                        self.log(f"本次任务耗时：{end_time-start_time:.2f}秒")
-                        self.log(f"=" * 30)
 
                     if parsed_json["answer"]["s"] == '0':
                         self.log(f"**解答**有误, 请参照msg修改。")            
-                        self.log(f"本次任务已完成。")
-                        end_time = time.perf_counter()
-                        self.log(f"本次任务耗时：{end_time-start_time:.2f}秒")
-                        self.log(f"=" * 30)
-
+                        
                     if parsed_json["problem"]["s"] == '0' or parsed_json["keypoint"]["s"] == '0' or parsed_json["answer"]["s"] == '0' :
                         self.alert("需参考console_log修改")
+                        end_time = time.perf_counter()
+                        self.log(f"本次任务已完成。")
+                        self.log(f"本次任务耗时：{end_time-start_time:.2f}秒")
+                        self.log(f"=" * 30)
                         break
-                    self.saven_next()
+                    self.save()
+                    self.next()
                 except Exception as e:
                     self.log(f"解析 JSON 或改写表单或alert失败: {e}")
                     print(f"异常，原始输出: {ai_output}")
@@ -147,7 +149,7 @@ class QualityCheckStep2():
             self.log(f"本次任务耗时：{end_time-start_time:.2f}秒")
             self.log(f"=" * 30)
 
-            self.stop.wait(5)
+            self.stop.wait(3)
             if self.stop.is_set():
                 break
         
@@ -173,6 +175,7 @@ class QualityCheckStep2():
             try:
                 choices_locator = operator_page.locator("table.qanwser")
                 if choices_locator.is_visible():
+                    self.log("1. 正在截图题目...")
                     save_path_choices = script_path + f"{problem_sn}_problem_choices.png"
                     clone_handle = choices_locator.evaluate_handle("""original => {
                         const clone = original.cloneNode(true);
@@ -264,29 +267,29 @@ class QualityCheckStep2():
     #         self.log(f"搜索复制失败: {e}")
     #         return ""
         
-    # def copy_discuss(self, page1: Page):
-    #     problem_sn = page1.locator("td:nth-child(2) > a:nth-child(2)").first.inner_text()
+    def copy_discuss(self, page1: Page):
+        problem_sn = page1.locator("td:nth-child(2) > a:nth-child(2)").first.inner_text()
         
-    #     try:
-    #         # 按页面元素交互逻辑复制解答
-    #         page1.locator("div#Discuss_" + problem_sn).click()
-    #         page1.locator("input.code").click()
-    #         iframe = page1.frame_locator("#htmlSourceFrame")
-    #         textarea = iframe.locator("textarea#htmlSource")
-    #         textarea.click()
-    #         page1.keyboard.press("Control+A")
-    #         page1.keyboard.press("Control+C")
-    #         content = pyperclip.paste()
-    #         page1.locator("input.hclose:nth-child(2)").click()
-    #         return content
+        try:
+            # 按页面元素交互逻辑复制
+            page1.locator("div#Discuss_" + problem_sn).click()
+            page1.locator("input.code").click()
+            iframe = page1.frame_locator("#htmlSourceFrame")
+            textarea = iframe.locator("textarea#htmlSource")
+            textarea.click()
+            page1.keyboard.press("Control+A")
+            page1.keyboard.press("Control+C")
+            content = pyperclip.paste()
+            page1.locator("input.hclose:nth-child(2)").click()
+            return content
         
-    #     except Exception as e:
-    #         self.log(f"搜索复制失败: {e}")
-    #         return ""
+        except Exception as e:
+            self.log(f"搜索复制失败: {e}")
+            return ""
         
     def copy_keypoint(self, page1: Page):
         unformatted = page1.locator("tbody:nth-child(2) > tr:nth-child(3) > td:nth-child(2)").first.inner_text()
-        formatted = re.sub(r'\d+:','',unformatted).strip()
+        formatted = re.sub(r'\d+：','',unformatted).strip()
         formatted = re.sub(r'\n+',',',formatted)
         return formatted
 
@@ -303,22 +306,20 @@ class QualityCheckStep2():
 
         try:
             # 填写分析
-            if data["analysis"]["s"] != '1':
-                page1.locator("div#Analyse_" + problem_sn).click()
-                page1.locator("input.code").click()
-                iframe = page1.frame_locator("#htmlSourceFrame")
-                textarea = iframe.locator("textarea#htmlSource")
-                textarea.fill(data["analysis"]["msg"].replace("。", "。\n"))
-                iframe.locator("div:nth-child(3) > input:nth-child(3)").click()
+            page1.locator("div#Analyse_" + problem_sn).click()
+            page1.locator("input.code").click()
+            iframe = page1.frame_locator("#htmlSourceFrame")
+            textarea = iframe.locator("textarea#htmlSource")
+            textarea.fill(data["analysis"]["msg"].replace("。", "。\n"))
+            iframe.locator("div:nth-child(3) > input:nth-child(3)").click()
 
             # 填写点评
-            if data["discuss"]["s"] != '1':
-                page1.locator("div#Discuss_" + problem_sn).click()
-                page1.locator("input.code").click()
-                iframe = page1.frame_locator("#htmlSourceFrame")
-                textarea = iframe.locator("textarea#htmlSource")
-                textarea.fill(data["discuss"]["msg"])
-                iframe.locator("div:nth-child(3) > input:nth-child(3)").click()
+            page1.locator("div#Discuss_" + problem_sn).click()
+            page1.locator("input.code").click()
+            iframe = page1.frame_locator("#htmlSourceFrame")
+            textarea = iframe.locator("textarea#htmlSource")
+            textarea.fill(data["discuss"]["msg"])
+            iframe.locator("div:nth-child(3) > input:nth-child(3)").click()
 
             # 判断解答，并填写解答
             # 暂不直接于此解答
@@ -339,10 +340,14 @@ class QualityCheckStep2():
             print(e)
             return
             
-    def saven_next(self):
+    def save(self):
         try:
-            self.page_1.locator("button:nth-child(1)").click()
+            self.page_1.locator("button:nth-child(1)").click()   
+        except Exception as e:
+            print(e)
+            
+    def next(self):
+        try:
             self.page_1.locator(".tablebar:nth-child(6) .tedit:nth-child(4)").click()
         except Exception as e:
             print(e)
-

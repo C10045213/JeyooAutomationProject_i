@@ -191,7 +191,7 @@ class QualityCheckStep1():
 
     def analyze_answer(self, problem_text: str, answer_text: str , client_num) -> str:
         """调用 AI 审核并返回结果"""
-        combined_content = f"题目内容(可能有误):\n{problem_text}\n\n参考答案:\n{answer_text}\n\n就解题准确性、思路笨重性进行审核，并对题目进行简评。"
+        combined_content = f"题目内容(可能有误):\n{problem_text}\n\n参考答案:\n{answer_text}\n\n就解题准确性、思路笨重性进行审核。"
         self.log("正在调用 AI API...")
         result = self.analyser.call_analyser(combined_content, client_num) 
         return result

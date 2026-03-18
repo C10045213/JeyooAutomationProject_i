@@ -45,10 +45,8 @@ class Analyser:
             choice = num
             if choice in self.client_map:
                 name, call_func = self.client_map[choice]
-                print(f"已选择 {name} 作为客户端。")
                 return call_func
             else:
-                print(f"输入错误，默认选择3")
                 return self._call_google
 
     def _call_deepseek(self, content: str) :
@@ -56,6 +54,9 @@ class Analyser:
         response = deepseek_client.chat.completions.create(
             model="deepseek-chat",
             messages=[{"role": "user", "content": content}],
+            response_format={
+                'type':'json_object'
+            },
             stream=False
         )
         # 解析DeepSeek返回文本

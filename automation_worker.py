@@ -100,8 +100,11 @@ class AutomationWorker(QThread):
                         self.stop_signal.clear()
                         self.current_strategy.execute()
                     except Exception as e:
-                        self.log_signal.emit(f"任务执行异常: {e}")
-                        print(f"任务执行异常: {e}")
+                        error_msg = str(e)
+                        if "closed" in error_msg.lower():
+                            self.log_signal.emit(f"检测到浏览器页面已关闭，需要重连...")
+                        else:
+                            self.log_signal.emit(f"任务执行其他异常: {e}")
                     
                     # self.save_event.clear()
 
@@ -153,7 +156,7 @@ class AutomationWorker(QThread):
 
             # 6. 处理终止（原死锁已修复）
 
-            time.sleep(0.1)
+            time.sleep(1)
             
         # 退出时清理
         self.browser_manager.close()
@@ -166,7 +169,6 @@ class AutomationWorker(QThread):
             self.pages = self.browser_manager.get_all_pages()
             self.current_strategy.locate_pages(self.pages) # 各Task的locate_pages函数名需统一
         elif self.current_strategy == None:
-            print(f"错误：尚未连接或未选择任务")
             self.log_signal.emit(f"错误：尚未连接或未选择任务")
 
     # rechoose AI API
@@ -195,17 +197,17 @@ class AutomationWorker(QThread):
         if self._loop:
             self._loop.quit()
 
-     # 应对各页面中需要手动处置的弹窗
+    # 应对各页面中需要手动处置的弹窗
     def manual_check(self, dialog):
-        print(f"弹窗出现了")
         dialog.accept() 
     
     def check_pages_ondialog(self):
         if self.pages != None:
-            for page in self.pages:
-                page.on("dialog", self.manual_check)
-                page.wait_for_timeout(200)
-        else: pass
+            for p in self.pages:
+                if not p.is_closed():
+                    p.on("dialog", self.manual_check)
+                    p.wait_for_timeout(1)
+
 
     # 切换任务
     def change_strategy_to_task1(self):
