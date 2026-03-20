@@ -206,7 +206,7 @@ class AutomationWorker(QThread):
             for p in self.pages:
                 if not p.is_closed():
                     p.on("dialog", self.manual_check)
-                    p.wait_for_timeout(1)
+                    p.wait_for_timeout(10)
 
 
     # 切换任务

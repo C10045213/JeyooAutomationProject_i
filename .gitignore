@@ -3,3 +3,4 @@ api.json
 __pycache__/
 *.pyc
 .vscode/
+.txt

@@ -79,19 +79,19 @@ class QualityCheckStep2():
             if imgs == None : 
                 self.log(f"***※截图失败※***")
                 return
-
-            self.log("2. 正在获取题目、答案、考点...")
-            answer = self.copy_answer(self.page_1)
-            keypoint = self.copy_keypoint(self.page_1)
-            problem = self.copy_problem(self.page_1)
             
-            # 跳过已经写入分析/点评的题目
+            # 跳过已经写入分析/点评的题目：尚需额外措施保持服务器友好
             # analysis = self.copy_analysis(self.page_1)
             discuss = self.copy_discuss(self.page_1)
             if "略" not in discuss:
                 self.next()
                 self.log(f">>>此题跳过")
                 continue
+            else:
+                self.log("2. 正在获取题目、答案、考点...")
+                problem = self.copy_problem(self.page_1)
+                answer = self.copy_answer(self.page_1)
+                keypoint = self.copy_keypoint(self.page_1)
 
 
             # 构造识题消息
@@ -111,8 +111,10 @@ class QualityCheckStep2():
             self.log(f">>> 审核结果已返回")
             
             # 发送结果到 GUI 进行渲染
-            self.result_log(ai_output)
-            print(ai_output)
+            if self._user_input == '1':
+                ai_output2 = ai_output.replace("\\", "\\\\")
+            self.result_log(ai_output2)
+            print(ai_output2)
 
             # 根据特定格式返回文本，尝试填写表单
             self.log(f"5. 正在改写表单...")
@@ -137,7 +139,11 @@ class QualityCheckStep2():
                         self.log(f"本次任务耗时：{end_time-start_time:.2f}秒")
                         self.log(f"=" * 30)
                         break
+                    
+                    # 注意检查输出
+                    self.page_1.wait_for_timeout(2000)
                     self.save()
+                    self.page_1.wait_for_timeout(200)
                     self.next()
                 except Exception as e:
                     self.log(f"解析 JSON 或改写表单或alert失败: {e}")
@@ -204,6 +210,10 @@ class QualityCheckStep2():
         text = text.replace("\\\\", "\\")
         text = text.replace("\\", "\\\\")
         text = text.replace(" ", "")
+        text = text.replace("【", "")
+        text = text.replace("】", "")
+        text = text.replace(">", "＞")
+        text = text.replace("<", "＜")
         return text
 
     def copy_problem(self, page1: Page):
@@ -212,7 +222,9 @@ class QualityCheckStep2():
         try:
             # 按页面元素交互逻辑复制解答
             page1.locator("div#Content_" + problem_sn).click()
+            page1.wait_for_timeout(200)
             page1.locator("input.code").click()
+            page1.wait_for_timeout(200)
             iframe = page1.frame_locator("#htmlSourceFrame")
             textarea = iframe.locator("textarea#htmlSource")
             textarea.click()
@@ -220,6 +232,7 @@ class QualityCheckStep2():
             page1.keyboard.press("Control+C")
             content = pyperclip.paste()
             page1.locator("input.hclose:nth-child(2)").click()
+            page1.wait_for_timeout(200)
             return content
         
         except Exception as e:
@@ -232,7 +245,9 @@ class QualityCheckStep2():
         try:
             # 按页面元素交互逻辑复制解答
             page1.locator("div#Method_" + problem_sn).click()
+            page1.wait_for_timeout(200)
             page1.locator("input.code").click()
+            page1.wait_for_timeout(200)
             iframe = page1.frame_locator("#htmlSourceFrame")
             textarea = iframe.locator("textarea#htmlSource")
             textarea.click()
@@ -240,6 +255,7 @@ class QualityCheckStep2():
             page1.keyboard.press("Control+C")
             content = pyperclip.paste()
             page1.locator("input.hclose:nth-child(2)").click()
+            page1.wait_for_timeout(200)
             return content
         
         except Exception as e:
@@ -273,7 +289,9 @@ class QualityCheckStep2():
         try:
             # 按页面元素交互逻辑复制
             page1.locator("div#Discuss_" + problem_sn).click()
+            page1.wait_for_timeout(200)
             page1.locator("input.code").click()
+            page1.wait_for_timeout(200)
             iframe = page1.frame_locator("#htmlSourceFrame")
             textarea = iframe.locator("textarea#htmlSource")
             textarea.click()
@@ -281,6 +299,7 @@ class QualityCheckStep2():
             page1.keyboard.press("Control+C")
             content = pyperclip.paste()
             page1.locator("input.hclose:nth-child(2)").click()
+            page1.wait_for_timeout(200)
             return content
         
         except Exception as e:
@@ -307,19 +326,25 @@ class QualityCheckStep2():
         try:
             # 填写分析
             page1.locator("div#Analyse_" + problem_sn).click()
+            page1.wait_for_timeout(200)
             page1.locator("input.code").click()
+            page1.wait_for_timeout(200)
             iframe = page1.frame_locator("#htmlSourceFrame")
             textarea = iframe.locator("textarea#htmlSource")
             textarea.fill(data["analysis"]["msg"].replace("。", "。\n"))
             iframe.locator("div:nth-child(3) > input:nth-child(3)").click()
+            page1.wait_for_timeout(200)
 
             # 填写点评
             page1.locator("div#Discuss_" + problem_sn).click()
+            page1.wait_for_timeout(200)
             page1.locator("input.code").click()
+            page1.wait_for_timeout(200)
             iframe = page1.frame_locator("#htmlSourceFrame")
             textarea = iframe.locator("textarea#htmlSource")
             textarea.fill(data["discuss"]["msg"])
             iframe.locator("div:nth-child(3) > input:nth-child(3)").click()
+            page1.wait_for_timeout(200)
 
             # 判断解答，并填写解答
             # 暂不直接于此解答
