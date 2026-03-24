@@ -37,7 +37,7 @@ class AutomationWorker(QThread):
         self.pages = None
         
         # 当前执行的策略与线程控制
-        self.current_strategy = 0
+        self.current_strategy = None
         self.method_thread = None
         self.stop_signal = threading.Event()
         # self.save_event = threading.Event() #TASK#2题目直答等待确认线程控制（或将作为TASK#3）
@@ -64,7 +64,6 @@ class AutomationWorker(QThread):
     def halt(self):
         self.log_signal.emit(f"已发出终止指令。")
         self.stop_signal.set()
-        self.log_signal.emit(f"***※已终止※***")
 
     def request_rechooseAPI(self):
         self._rechooseAPI_requested = True  
@@ -154,8 +153,6 @@ class AutomationWorker(QThread):
             # 5. 处理弹窗
             self.check_pages_ondialog()
 
-            # 6. 处理终止（原死锁已修复）
-
             time.sleep(1)
             
         # 退出时清理
@@ -173,10 +170,12 @@ class AutomationWorker(QThread):
 
     # rechoose AI API
     def client_select_request(self):
-        """选择 AI 审核客户端"""
+        """重选 AI 审核客户端"""
+        self.current_strategy = None
         ls = []
         self.log_signal.emit(f"*" * 20)
         self.log_signal.emit("请预先确认 VPN 已正确配置")
+        self.log_signal.emit(f"原任务策略已退出")
         self.log_signal.emit(f"*" * 20)
         self.log_signal.emit("请选择 AI 审核客户端:")
         for num, name in self.analyser.client_map.items():
@@ -192,8 +191,8 @@ class AutomationWorker(QThread):
             self._user_input = data
             self.log_signal.emit(f"#{data} Choosen")
         else: 
-            self.log_signal.emit(f"默认选择3号位。")
-            self._user_input = "3"
+            self.log_signal.emit(f"操作已取消。")
+            self._user_input = ""
         if self._loop:
             self._loop.quit()
 
@@ -208,14 +207,19 @@ class AutomationWorker(QThread):
                     p.on("dialog", self.manual_check)
                     p.wait_for_timeout(10)
 
-
     # 切换任务
     def change_strategy_to_task1(self):
+        if self._user_input == '':
+            self.log_signal.emit(f"未选择API！")
+            return
         self.current_strategy = task1.QualityCheckStep1(self.log_signal.emit,self.result_signal.emit,self._user_input, self.stop_signal)
         self.log_signal.emit(f"已切换工作模式: {task1.QualityCheckStep1.__doc__}")
         self._reinit_requested = True
 
     def change_strategy_to_task2(self):
+        if self._user_input == '':
+            self.log_signal.emit(f"未选择API！")
+            return
         self.current_strategy = task2.QualityCheckStep2(self.log_signal.emit,self.result_signal.emit,self.critical_signal.emit,self._user_input, self.stop_signal)
         self.log_signal.emit(f"已切换工作模式: {task2.QualityCheckStep2.__doc__}")
         self._reinit_requested = True

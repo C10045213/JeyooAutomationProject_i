@@ -7,6 +7,7 @@ from playwright.sync_api import Page
 import json
 import time
 import threading
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
 
 
 class QualityCheckStep2():
@@ -31,7 +32,7 @@ class QualityCheckStep2():
         self.instruction = ""
 
     def sys_instruct_AI(self):
-        with open("task1_sys_instruct.txt", 'r', encoding='utf-8') as f:
+        with open("task2_sys_instruct.txt", 'r', encoding='utf-8') as f:
             return f.read().strip()
 
     def locate_pages(self, pages):
@@ -69,6 +70,9 @@ class QualityCheckStep2():
         
         # 先保存当前页修改
         self.save()
+        if self.stop.is_set():
+            self.log(f"***※已终止※***")
+
         while not self.stop.is_set():  
                 
             self.log("\n>>> 开始执行任务...")
@@ -78,9 +82,9 @@ class QualityCheckStep2():
             imgs = self.choices_screenshot(self.page_1)
             if imgs == None : 
                 self.log(f"***※截图失败※***")
+                self.stop.set()
                 return
             
-            # 跳过已经写入分析/点评的题目：尚需额外措施保持服务器友好
             # analysis = self.copy_analysis(self.page_1)
             discuss = self.copy_discuss(self.page_1)
             if "略" not in discuss:
@@ -107,14 +111,20 @@ class QualityCheckStep2():
 
             # 3. 审核 
             self.log("4. 提交与 AI 审核...")
-            ai_output = self.analyze_answer(problem, choices_alltext, answer, keypoint, self._user_input)
-            self.log(f">>> 审核结果已返回")
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(self.analyze_answer, problem, choices_alltext, answer, keypoint, self._user_input)
+                try:
+                    result = future.result(timeout=60)
+                    ai_output = result
+                    self.log(f">>> 审核结果已返回")
+                except TimeoutError:
+                    ai_output = ""
+                    self.log(f"等待response返回超时。")
+                    return
             
             # 发送结果到 GUI 进行渲染
-            if self._user_input == '1':
-                ai_output2 = ai_output.replace("\\", "\\\\")
-            self.result_log(ai_output2)
-            print(ai_output2)
+            self.result_log(ai_output)
+            print(ai_output)
 
             # 根据特定格式返回文本，尝试填写表单
             self.log(f"5. 正在改写表单...")
@@ -135,10 +145,18 @@ class QualityCheckStep2():
                     if parsed_json["problem"]["s"] == '0' or parsed_json["keypoint"]["s"] == '0' or parsed_json["answer"]["s"] == '0' :
                         self.alert("需参考console_log修改")
                         end_time = time.perf_counter()
-                        self.log(f"本次任务已完成。")
+                        self.log(f"本次任务已结束。")
                         self.log(f"本次任务耗时：{end_time-start_time:.2f}秒")
                         self.log(f"=" * 30)
-                        break
+                        return
+
+                    if len(parsed_json["analysis"]["msg"]) > 100:
+                        self.alert("请检查AI输出")
+                        end_time = time.perf_counter()
+                        self.log(f"本次任务已结束。")
+                        self.log(f"本次任务耗时：{end_time-start_time:.2f}秒")
+                        self.log(f"=" * 30)
+                        return
                     
                     # 注意检查输出
                     self.page_1.wait_for_timeout(2000)
@@ -148,6 +166,7 @@ class QualityCheckStep2():
                 except Exception as e:
                     self.log(f"解析 JSON 或改写表单或alert失败: {e}")
                     print(f"异常，原始输出: {ai_output}")
+                    return
 
             
             self.log(f"本次任务已完成。")
@@ -157,7 +176,8 @@ class QualityCheckStep2():
 
             self.stop.wait(3)
             if self.stop.is_set():
-                break
+                self.log(f"***※已终止※***")
+                return
         
 
     def choices_screenshot(self, operator_page: Page):
@@ -176,6 +196,7 @@ class QualityCheckStep2():
             self.log(f"当前题目SN: {problem_sn}")
         except Exception as e:
             self.log(f"***※未能找到题目SN※***: {e}")
+            self.stop.set()
 
         if problem_sn:
             try:
@@ -199,6 +220,7 @@ class QualityCheckStep2():
                     self.log("※非选择题※")
             except Exception as e:
                 self.log(f"***※选项截图失败※***: {e}")
+                self.stop.set()
  
         return save_path_choices if problem_sn else None
     
@@ -237,6 +259,7 @@ class QualityCheckStep2():
         
         except Exception as e:
             self.log(f"搜索复制失败: {e}")
+            self.stop.set()
             return ""
 
     def copy_answer(self, page1: Page):
@@ -260,6 +283,7 @@ class QualityCheckStep2():
         
         except Exception as e:
             self.log(f"搜索复制失败: {e}")
+            self.stop.set()
             return ""
         
     # 大部分分析与点评处于“略”的状态，无需审阅。
@@ -281,6 +305,7 @@ class QualityCheckStep2():
         
     #     except Exception as e:
     #         self.log(f"搜索复制失败: {e}")
+    #         self.stop.set()
     #         return ""
         
     def copy_discuss(self, page1: Page):
@@ -304,6 +329,7 @@ class QualityCheckStep2():
         
         except Exception as e:
             self.log(f"搜索复制失败: {e}")
+            self.stop.set()
             return ""
         
     def copy_keypoint(self, page1: Page):
@@ -314,11 +340,12 @@ class QualityCheckStep2():
 
     def analyze_answer(self, problem_text: str, choices_text: str, answer_text: str, keypoint_text: str, client_num) -> str:
         """调用 AI 审核并返回结果"""
+        self.log(f"正在调用 AI API...")
         self.instruction = self.sys_instruct_AI()
         combined_content = f"{self.instruction}\n\nInputData：problem:{problem_text}\n{choices_text}\nkeypoint：{keypoint_text}\nanswer:{answer_text}\n"
-        self.log("正在调用 AI API...")
         result = self.analyser.call_analyser(combined_content, client_num) 
         return result
+
     
     def fill_forms(self, page1: Page, data: dict):
         problem_sn = page1.locator("td:nth-child(2) > a:nth-child(2)").first.inner_text()
@@ -361,18 +388,23 @@ class QualityCheckStep2():
             self.log(f"填写完成。")           
          
         except Exception as e:
-            self.log(f"fill_form func error")
+            self.log(f"***※填表异常※***")
             print(e)
+            self.stop.set()
             return
             
     def save(self):
         try:
-            self.page_1.locator("button:nth-child(1)").click()   
+            self.page_1.get_by_role('button',name='保存').click()
         except Exception as e:
+            self.log(f"***※保存异常※***")
             print(e)
+            self.stop.set()
             
     def next(self):
         try:
-            self.page_1.locator(".tablebar:nth-child(6) .tedit:nth-child(4)").click()
+            self.page_1.locator(".tablebar:nth-child(2) .tedit:nth-child(4)").click()
         except Exception as e:
+            self.log(f"***※翻页异常※***")
             print(e)
+            self.stop.set()

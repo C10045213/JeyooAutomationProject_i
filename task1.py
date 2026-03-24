@@ -3,6 +3,7 @@ import os
 import pyperclip
 import base64
 import threading
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
 
 class QualityCheckStep1():
     """审题逻辑"""
@@ -15,6 +16,10 @@ class QualityCheckStep1():
         self._user_input = input_num_for_AI
         self.page_1 = None
         self.page_2 = None
+
+    def sys_instruct_AI(self):
+        with open("task1_sys_instruct.txt", 'r', encoding='utf-8') as f:
+            return f.read().strip()
 
     def locate_pages(self, pages):
         for page in pages:
@@ -32,6 +37,8 @@ class QualityCheckStep1():
             self.log("!!! 警告: 未找到题目页面 (div.box-wrapper)")
 
     def execute(self):
+        if self.stop.is_set():
+            self.log(f"***※已终止※***")
 
         while not self.stop.is_set():
             self.log("\n>>> 开始执行任务...")
@@ -85,10 +92,16 @@ class QualityCheckStep1():
 
             # 3. 审核 
             self.log("4. 提交与 AI 审核...")
-            final_result = self.analyze_answer(problem_alltext, answer, self._user_input)
-            ai_output = ""
-            ai_output = final_result
-            self.log(f">>> 审核结果已返回")
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(self.analyze_answer, problem_alltext, answer, self._user_input)
+                try:
+                    result = future.result(timeout=60)
+                    ai_output = result
+                    self.log(f">>> 审核结果已返回")
+                except TimeoutError:
+                    ai_output = ""
+                    self.log(f"等待response返回超时。")
+                    return
             
             # 发送结果到 GUI 进行渲染
             self.result(ai_output)
@@ -192,8 +205,8 @@ class QualityCheckStep1():
             return ""
 
     def analyze_answer(self, problem_text: str, answer_text: str , client_num) -> str:
-        """调用 AI 审核并返回结果"""
-        combined_content = f"题目内容(可能有误):\n{problem_text}\n\n参考答案:\n{answer_text}\n\n就解题准确性、思路笨重性进行审核。"
-        self.log("正在调用 AI API...")
+        """在限定时间内调用 AI 审核并返回结果"""
+        self.log(f"正在调用 AI API...")
+        combined_content = f"题目内容(可能有误):\n{problem_text}\n\n参考答案:\n{answer_text}\n\n" + self.sys_instruct_AI()
         result = self.analyser.call_analyser(combined_content, client_num) 
         return result

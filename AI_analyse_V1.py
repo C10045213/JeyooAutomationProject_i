@@ -53,10 +53,7 @@ class Analyser:
         """封装DeepSeek调用 + 结果解析"""
         response = deepseek_client.chat.completions.create(
             model="deepseek-chat",
-            messages=[{"role": "user", "content": content}],
-            response_format={
-                'type':'json_object'
-            },
+            messages=[{"role": "user", "content": content}], 
             stream=False
         )
         # 解析DeepSeek返回文本
