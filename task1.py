@@ -4,6 +4,7 @@ import pyperclip
 import base64
 import threading
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
+from playwright.sync_api import Page
 
 class QualityCheckStep1():
     """审题逻辑"""
@@ -14,29 +15,43 @@ class QualityCheckStep1():
         self.stop = stop_signal
         self.analyser = analyser.Analyser()
         self._user_input = input_num_for_AI
-        self.page_1 = None
-        self.page_2 = None
+        self.page_1: Page = None
+        self.page_2: Page = None
 
     def sys_instruct_AI(self):
         with open("task1_sys_instruct.txt", 'r', encoding='utf-8') as f:
             return f.read().strip()
 
     def locate_pages(self, pages):
+        page:Page = None
         for page in pages:
             try:
                 if page.locator("div.box-wrapper").is_visible(timeout=500):
                     self.page_1 = page
                     self.log(f"已锁定题目页面: {page.title()}")
-                elif page.locator("input#SName").is_visible(timeout=500):
+                elif page.locator("label:nth-child(34)").is_visible(timeout=500):
                     self.page_2 = page
                     self.log(f"已锁定搜索页面: {page.title()}")
             except:
-                continue
+                self.log(f"页面定位异常。")
         
         if not self.page_1:
-            self.log("!!! 警告: 未找到题目页面 (div.box-wrapper)")
+            self.log("!!! 警告: 未找到题目页面。")
+        if not self.page_2:
+            self.log("!!! 警告: 未找到搜索页面。")
 
     def execute(self):
+        if self.page_1 == None or self.page_2 == None:
+            self.log(f"页面未定位，非法操作。")
+            return
+        
+        if self.page_1.locator("div.box-wrapper").is_visible(timeout=500) == 0 or self.page_2.locator("label:nth-child(34)").is_visible(timeout=500) == 0:
+            self.log(f"非目标页面，请重连。")
+        
+        if self.page_1.is_closed() or self.page_2.is_closed():
+            self.log(f"***※目标页面已关闭※***")
+            return 
+
         if self.stop.is_set():
             self.log(f"***※已终止※***")
 
@@ -101,7 +116,7 @@ class QualityCheckStep1():
                 except TimeoutError:
                     ai_output = ""
                     self.log(f"等待response返回超时。")
-                    return
+                    break
             
             # 发送结果到 GUI 进行渲染
             self.result(ai_output)

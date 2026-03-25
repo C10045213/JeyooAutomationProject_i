@@ -42,10 +42,10 @@ class QualityCheckStep2():
                     self.page_1 = page
                     self.log(f"已锁定题目全修改页面: {page.title()}")
             except:
-                continue
+                self.log(f"页面定位异常。")
         
         if not self.page_1:
-            self.log("!!! 警告: 未找到题目全修改页面 (div.box-wrapper)")
+            self.log("!!! 警告: 未找到题目全修改页面")
 
     def encodebase64(self, img):
         # ... Base64编码 ...
@@ -68,6 +68,18 @@ class QualityCheckStep2():
 
     def execute(self):
         
+        if self.page_1 == None:
+            self.log(f"页面未定位，非法操作。")
+            return
+        
+        if self.page_1.locator("input#SStatus_3").is_visible(timeout=500) == 0:
+            self.log(f"非目标页面，请重连。")
+            return
+
+        if self.page_1.is_closed():
+            self.log(f"***※目标页面已关闭※***")
+            return 
+        
         # 先保存当前页修改
         self.save()
         if self.stop.is_set():
@@ -77,6 +89,8 @@ class QualityCheckStep2():
                 
             self.log("\n>>> 开始执行任务...")
             start_time = time.perf_counter()
+            self.page_1.locator(".tablebar:nth-child(2) > h2 > input").is_visible(timeout=500)
+            num = self.page_1.locator(".tablebar:nth-child(2) > h2 > input").get_attribute("value")
 
             # 1. 截图
             imgs = self.choices_screenshot(self.page_1)
@@ -89,7 +103,10 @@ class QualityCheckStep2():
             discuss = self.copy_discuss(self.page_1)
             if "略" not in discuss:
                 self.next()
-                self.log(f">>>此题跳过")
+                self.log(f"当前页码：{num}，>>>此题跳过")
+                if self.stop.is_set():
+                    self.log(f"***※已终止※***")
+                    return
                 continue
             else:
                 self.log("2. 正在获取题目、答案、考点...")
@@ -140,7 +157,12 @@ class QualityCheckStep2():
                         self.log(f"**考点**有误, 请参照msg修改。")            
 
                     if parsed_json["answer"]["s"] == '0':
-                        self.log(f"**解答**有误, 请参照msg修改。")            
+                        self.log(f"**解答**有误, 请参照msg自行或复制与AI修改。")
+                        self.log("*" * 20)
+                        self.log(problem)
+                        self.log(choices_alltext)
+                        self.log(answer)  
+                        self.log("*" * 20)          
                         
                     if parsed_json["problem"]["s"] == '0' or parsed_json["keypoint"]["s"] == '0' or parsed_json["answer"]["s"] == '0' :
                         self.alert("需参考console_log修改")
@@ -150,7 +172,7 @@ class QualityCheckStep2():
                         self.log(f"=" * 30)
                         return
 
-                    if len(parsed_json["analysis"]["msg"]) > 100:
+                    if len(re.sub(r'[^\u4e00-\u9fff]', "", parsed_json["analysis"]["msg"])) > 50 or "解答" in parsed_json["analysis"]["msg"] or "涉及" in parsed_json["analysis"]["msg"]:
                         self.alert("请检查AI输出")
                         end_time = time.perf_counter()
                         self.log(f"本次任务已结束。")
@@ -169,15 +191,16 @@ class QualityCheckStep2():
                     return
 
             
-            self.log(f"本次任务已完成。")
+            self.log(f"当前页码：{num}，本次任务已完成。")
             end_time = time.perf_counter()
             self.log(f"本次任务耗时：{end_time-start_time:.2f}秒")
             self.log(f"=" * 30)
 
-            self.stop.wait(3)
             if self.stop.is_set():
                 self.log(f"***※已终止※***")
                 return
+
+            self.stop.wait(3)
         
 
     def choices_screenshot(self, operator_page: Page):

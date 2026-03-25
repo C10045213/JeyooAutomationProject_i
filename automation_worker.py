@@ -31,6 +31,7 @@ class AutomationWorker(QThread):
         self._task1_flag = False
         self._task2_flag = False
         self._save_task_requested = False
+        self._connected = False
         
         # Playwright
         self.browser_manager = BrowserManager(self.log_signal.emit)
@@ -150,10 +151,10 @@ class AutomationWorker(QThread):
                 self._task1_flag = False
                 self._task2_flag = True
 
-            # 5. 处理弹窗
-            self.check_pages_ondialog()
+            # 5. 刷新与处理弹窗
+            self.refresh_n_check_pages_ondialog()
 
-            time.sleep(1)
+            time.sleep(5)
             
         # 退出时清理
         self.browser_manager.close()
@@ -161,8 +162,8 @@ class AutomationWorker(QThread):
 # ========== 线程基础逻辑 ==========
     def _do_reinit(self):
         """线程内部执行的重置逻辑"""
-        connected = self.browser_manager.connect()
-        if connected and self.current_strategy:
+        self.connected = self.browser_manager.connect()
+        if self.connected and self.current_strategy:
             self.pages = self.browser_manager.get_all_pages()
             self.current_strategy.locate_pages(self.pages) # 各Task的locate_pages函数名需统一
         elif self.current_strategy == None:
@@ -196,16 +197,34 @@ class AutomationWorker(QThread):
         if self._loop:
             self._loop.quit()
 
-    # 应对各页面中需要手动处置的弹窗
+    # 应对各页面中需要手动处置的弹窗，并刷新当前打开所有页面确保无遗漏
     def manual_check(self, dialog):
         dialog.accept() 
     
-    def check_pages_ondialog(self):
-        if self.pages != None:
-            for p in self.pages:
-                if not p.is_closed():
-                    p.on("dialog", self.manual_check)
-                    p.wait_for_timeout(10)
+    def refresh_n_check_pages_ondialog(self):
+        if self.pages is None:
+            return
+        
+        if self.connected:
+            try:
+                self.pages = self.browser_manager.get_all_pages()
+            except:
+                self.log_signal.emit(f"刷新页面出现异常。")
+
+        for p in self.pages:
+            try:
+                if p.is_closed():
+                    continue
+                p.on("dialog", self.manual_check)
+                p.wait_for_timeout(100)
+            except Exception as e:
+                error_msg = str(e).lower()
+                if "closed" in error_msg or "detached" in error_msg:
+                    if p in self.pages:
+                        self.pages.remove(p)
+                    continue
+                else:
+                    self.log_signal.emit(f"检查页面时出错: {e}")
 
     # 切换任务
     def change_strategy_to_task1(self):
