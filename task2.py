@@ -130,6 +130,13 @@ class QualityCheckStep2():
                 choices_alltext = self.analyser.call_analyser(content_payload, '4') 
                 print(choices_alltext)
 
+            # 于此删除本地图片
+            try:
+                if os.path.exists(imgs):
+                    os.remove(imgs)
+            except Exception as e:
+                self.log(f"清理截图文件失败: {e}")
+
             # 3. 审核 
             self.log("4. 提交与 AI 审核...")
             with ThreadPoolExecutor(max_workers=1) as executor:
@@ -141,6 +148,7 @@ class QualityCheckStep2():
                 except TimeoutError:
                     ai_output = ""
                     self.log(f"等待response返回超时。")
+                    self.stop.set()
                     return
             
             # 发送结果到 GUI 进行渲染

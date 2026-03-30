@@ -6,8 +6,11 @@ import subprocess
 from PyQt6.QtCore import QThread, pyqtSignal, QEventLoop
 from AI_analyse_V1 import Analyser
 from broswer_manager import BrowserManager
+from dotenv import load_dotenv
 
 import task1, task2
+
+load_dotenv()
 
 class AutomationWorker(QThread):
     
@@ -39,6 +42,8 @@ class AutomationWorker(QThread):
         # Playwright
         self.browser_manager = BrowserManager(self.log_signal.emit)
         self.pages = None
+        self.browser_path = None
+        self.browser_process = None
         
         # 当前执行的策略与线程控制
         self.current_strategy = None
@@ -169,14 +174,19 @@ class AutomationWorker(QThread):
             if self._request_restart:
                 self._request_restart = False
                 try:
-                    os.system("taskkill /F /IM msedge.exe")
+                    self.browser_process = os.getenv("BROWSER_PROCESS")
+                    self.browser_path = os.getenv("BROWSER_PATH")
+
+                    cmdline1 = f"taskkill /F /IM {self.browser_process}"
+
+                    os.system(cmdline1)
                     self.browser_manager.close()
                     subprocess.Popen([
-                        r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+                        self.browser_path,
                         "--remote-debugging-port=9222"
                     ], shell=False)
                 except Exception as e:
-                    self.log({e})
+                    self.log_signal.emit(e)
 
                 try:
                     process_filtered = subprocess.run(

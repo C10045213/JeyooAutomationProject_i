@@ -118,12 +118,13 @@ class QualityCheckStep1():
                 except TimeoutError:
                     ai_output = ""
                     self.log(f"等待response返回超时。")
+                    self.stop.set()
                     break
             
             # 发送结果到 GUI 进行渲染
             self.result(ai_output)
             
-            self.log(f"本次任务已完成。")
+            self.log(f"本次任务已完成/终止。")
             self.log('='*30)
             break
 
