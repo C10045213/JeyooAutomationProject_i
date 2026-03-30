@@ -13,6 +13,7 @@ qwen_client = OpenAI(
     base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
 )
 
+
 # DeepSeek 客户端
 deepseek_client = OpenAI(
     api_key=os.getenv("DEEPSEEK_API_KEY"),
@@ -36,7 +37,8 @@ class Analyser:
             "1": ("DeepSeek", self._call_deepseek),
             "2": ("doubao", self._call_doubao),
             "3": ("Google Gemini", self._call_google),
-            "4": ("Qwen", self._call_qwen)
+            "4": ("Qwen", self._call_qwen),
+            "99": ("QwenVL", self._call_qwenvl)
         }
 
     def select_analyser_client(self, num: str):
@@ -89,6 +91,16 @@ class Analyser:
     
     def _call_qwen(self, content: str):
         """封装Qwen调用 + 结果解析"""
+        response = qwen_client.chat.completions.create(
+            model="qwen3.5-flash",
+            messages=[{"role": "user", "content": content}],
+            stream=False,
+        )
+        # 解析Qwen返回文本
+        return(response.choices[0].message.content)
+    
+    def _call_qwenvl(self, content: str):
+        """Qwen快速识别"""
         response = qwen_client.chat.completions.create(
             model="qwen3-vl-flash",
             messages=[{"role": "user", "content": content}],

@@ -103,8 +103,7 @@ class QualityCheckStep1():
             content_payload.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{problem_base64}"}})
             if choices_path:
                 content_payload.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{choices_base64}"}})
-
-            problem_alltext = self.analyser.call_analyser(content_payload, '4') 
+            problem_alltext = self.analyser.call_analyser(content_payload, '99')
             print(problem_alltext)
 
             # 3. 审核 

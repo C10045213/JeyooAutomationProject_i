@@ -125,9 +125,9 @@ class QualityCheckStep2():
             if choices_pic64 != '':
                 self.log("3. 调用多模态LLM进行题目OCR...")
                 content_payload = []
-                content_payload.append({"type": "text", "text": "用latex源码仅输出图片识别内容。"})
+                content_payload.append({"type": "text", "text": "用latex源码仅输出图片中文本的识别内容。"})
                 content_payload.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{choices_pic64}"}})
-                choices_alltext = self.analyser.call_analyser(content_payload, '4') 
+                choices_alltext = self.analyser.call_analyser(content_payload, '99')
                 print(choices_alltext)
 
             # 于此删除本地图片

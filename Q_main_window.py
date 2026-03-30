@@ -185,6 +185,7 @@ class MainWindow(QMainWindow):
         def texreplace(text):
             # 先把双反斜杠转义，防止被 Markdown 吃掉
             # 这一步非常激进，建议仅针对公式块处理，但在简单场景下可用
+            text = text.replace('\\\\', '\\') 
             text = text.replace('\\', '\\\\') 
             return text
         

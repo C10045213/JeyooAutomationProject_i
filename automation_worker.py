@@ -220,15 +220,14 @@ class AutomationWorker(QThread):
     def client_select_request(self):
         """重选 AI 审核客户端"""
         self.current_strategy = None
-        ls = []
         self.log_signal.emit(f"*" * 20)
         self.log_signal.emit("请预先确认 VPN 已正确配置")
         self.log_signal.emit(f"原任务策略已退出")
         self.log_signal.emit(f"*" * 20)
         self.log_signal.emit("请选择 AI 审核客户端:")
         for num, name in self.analyser.client_map.items():
-            self.log_signal.emit(f"{num} . {name[0]}")
-            ls.append(num)
+            if num != '99':
+                self.log_signal.emit(f"{num} . {name[0]}")
 
         self._loop = QEventLoop()
         self.input_signal.emit("请选择")
