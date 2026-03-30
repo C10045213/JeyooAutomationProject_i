@@ -1,6 +1,8 @@
 import keyboard
 import time
 import threading
+import os
+import subprocess
 from PyQt6.QtCore import QThread, pyqtSignal, QEventLoop
 from AI_analyse_V1 import Analyser
 from broswer_manager import BrowserManager
@@ -23,6 +25,7 @@ class AutomationWorker(QThread):
         self.analyser = Analyser()
         
         # 标志位
+        self._request_restart = False
         self._task_requested = False   
         self._reinit_requested = False 
         self._rechooseAPI_requested = False
@@ -45,9 +48,11 @@ class AutomationWorker(QThread):
 
     def request_change_strategy_to_task1(self):
         self._requested_change_to_task1 = True
+        self.log_signal.emit(f"请等待...")
 
     def request_change_strategy_to_task2(self):
         self._requested_change_to_task2 = True
+        self.log_signal.emit(f"请等待...")
 
     def request_reinit(self):
         self._reinit_requested = True
@@ -55,6 +60,7 @@ class AutomationWorker(QThread):
 
     def _hotkey_callback(self):
         self._task_requested = True
+        self.log_signal.emit(f"请等待...")
 
     # TASK#2直答专用快捷键
     # def _save_hotkey_callback(self):
@@ -68,6 +74,11 @@ class AutomationWorker(QThread):
 
     def request_rechooseAPI(self):
         self._rechooseAPI_requested = True  
+        self.log_signal.emit(f"请等待...")
+
+    def request_restart(self):
+        self._request_restart = True
+        self.log_signal.emit(f"请等待...")
 
     def run(self):
         self.log_signal.emit(f'=' * 20)
@@ -154,6 +165,32 @@ class AutomationWorker(QThread):
             # 5. 刷新与处理弹窗
             self.refresh_n_check_pages_ondialog()
 
+            # 6. 处理重启动
+            if self._request_restart:
+                self._request_restart = False
+                try:
+                    os.system("taskkill /F /IM msedge.exe")
+                    self.browser_manager.close()
+                    subprocess.Popen([
+                        r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+                        "--remote-debugging-port=9222"
+                    ], shell=False)
+                except Exception as e:
+                    self.log({e})
+
+                try:
+                    process_filtered = subprocess.run(
+                        ['tasklist', '/FI', 'IMAGENAME eq msedge.exe'],
+                        capture_output=True,
+                        text=True,
+                        encoding='gbk'
+                    )
+                    # 如果输出包含 msedge.exe，说明进程在运行
+                    if 'msedge.exe' not in process_filtered.stdout:
+                        self.log(f"command重启msedge.exe:9222失败，请检查路径")
+                except Exception as e:
+                    print(f"检查进程失败: {e}")
+
             time.sleep(5)
             
         # 退出时清理
@@ -197,9 +234,14 @@ class AutomationWorker(QThread):
         if self._loop:
             self._loop.quit()
 
-    # 应对各页面中需要手动处置的弹窗，并刷新当前打开所有页面确保无遗漏
+    # 应对各页面中需要手动处置的弹窗，并刷新当前打开所有页面确保处理所有弹窗
     def manual_check(self, dialog):
-        dialog.accept() 
+        try:
+            dialog.accept()
+        # 跳过异常（重要）
+        except:
+            return
+             
     
     def refresh_n_check_pages_ondialog(self):
         if self.pages is None:
@@ -232,7 +274,7 @@ class AutomationWorker(QThread):
             self.log_signal.emit(f"未选择API！")
             return
         self.current_strategy = task1.QualityCheckStep1(self.log_signal.emit,self.result_signal.emit,self._user_input, self.stop_signal)
-        self.log_signal.emit(f"已切换工作模式: {task1.QualityCheckStep1.__doc__}")
+        self.log_signal.emit(f"正在切换工作模式: {task1.QualityCheckStep1.__doc__}")
         self._reinit_requested = True
 
     def change_strategy_to_task2(self):
@@ -240,7 +282,7 @@ class AutomationWorker(QThread):
             self.log_signal.emit(f"未选择API！")
             return
         self.current_strategy = task2.QualityCheckStep2(self.log_signal.emit,self.result_signal.emit,self.critical_signal.emit,self._user_input, self.stop_signal)
-        self.log_signal.emit(f"已切换工作模式: {task2.QualityCheckStep2.__doc__}")
+        self.log_signal.emit(f"正在换工作模式: {task2.QualityCheckStep2.__doc__}")
         self._reinit_requested = True
 
 

@@ -32,8 +32,9 @@ class QualityCheckStep1():
                 elif page.locator("label:nth-child(34)").is_visible(timeout=500):
                     self.page_2 = page
                     self.log(f"已锁定搜索页面: {page.title()}")
-            except:
+            except Exception as e:
                 self.log(f"页面定位异常。")
+                self.log({e})
         
         if not self.page_1:
             self.log("!!! 警告: 未找到题目页面。")
@@ -47,6 +48,7 @@ class QualityCheckStep1():
         
         if self.page_1.locator("div.box-wrapper").is_visible(timeout=500) == 0 or self.page_2.locator("label:nth-child(34)").is_visible(timeout=500) == 0:
             self.log(f"非目标页面，请重连。")
+            return
         
         if self.page_1.is_closed() or self.page_2.is_closed():
             self.log(f"***※目标页面已关闭※***")

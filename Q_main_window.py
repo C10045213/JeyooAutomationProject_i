@@ -71,7 +71,7 @@ class MainWindow(QMainWindow):
                 border: 1px solid #666;
                 padding: 5px 15px;
                 border-radius: 3px;
-                min-width: 60px;
+                min-width: 45px;
             }
             QPushButton:hover {
                 background-color: #555;
@@ -147,11 +147,13 @@ class MainWindow(QMainWindow):
         self.btn2 = QPushButton("重选API")
         self.btn3 = QPushButton("TASK#1")
         self.btn4 = QPushButton("TASK#2")
+        self.btn5 = QPushButton("重启动")
 
         button_layout.addWidget(self.btn1)
         button_layout.addWidget(self.btn2)
         button_layout.addWidget(self.btn3)
         button_layout.addWidget(self.btn4)
+        button_layout.addWidget(self.btn5)
 
         # 将按钮布局添加到主垂直布局的最下方
         layout.addLayout(button_layout)
@@ -160,6 +162,7 @@ class MainWindow(QMainWindow):
         self.btn2.clicked.connect(self.worker.request_rechooseAPI)
         self.btn3.clicked.connect(self.worker.request_change_strategy_to_task1)
         self.btn4.clicked.connect(self.worker.request_change_strategy_to_task2)
+        self.btn5.clicked.connect(self.worker.request_restart)
 
     def receive_input(self, prompt):
         """接收输入请求并显示对话框"""

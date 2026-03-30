@@ -79,7 +79,7 @@ class QualityCheckStep2():
         if self.page_1.is_closed():
             self.log(f"***※目标页面已关闭※***")
             return 
-        
+
         # 先保存当前页修改
         self.save()
         if self.stop.is_set():
@@ -91,6 +91,7 @@ class QualityCheckStep2():
             start_time = time.perf_counter()
             self.page_1.locator(".tablebar:nth-child(2) > h2 > input").is_visible(timeout=500)
             num = self.page_1.locator(".tablebar:nth-child(2) > h2 > input").get_attribute("value")
+            final_num = self.page_1.locator(".tablebar:nth-child(2) span").inner_text()
 
             # 1. 截图
             imgs = self.choices_screenshot(self.page_1)
@@ -104,6 +105,9 @@ class QualityCheckStep2():
             if "略" not in discuss:
                 self.next()
                 self.log(f"当前页码：{num}，>>>此题跳过")
+                if num == final_num:
+                    self.stop.set()
+                    self.log(f"当前列表处理结束。")
                 if self.stop.is_set():
                     self.log(f"***※已终止※***")
                     return
@@ -159,9 +163,10 @@ class QualityCheckStep2():
                     if parsed_json["answer"]["s"] == '0':
                         self.log(f"**解答**有误, 请参照msg自行或复制与AI修改。")
                         self.log("*" * 20)
-                        self.log(problem)
-                        self.log(choices_alltext)
-                        self.log(answer)  
+                        problem_alltext = problem + "\n" + choices_alltext + "\n" + answer
+                        self.log(problem_alltext)
+                        pyperclip.copy(problem_alltext + "\n" + "审阅此解答")
+                        self.log(f"已复制至剪切板。")
                         self.log("*" * 20)          
                         
                     if parsed_json["problem"]["s"] == '0' or parsed_json["keypoint"]["s"] == '0' or parsed_json["answer"]["s"] == '0' :
@@ -195,6 +200,10 @@ class QualityCheckStep2():
             end_time = time.perf_counter()
             self.log(f"本次任务耗时：{end_time-start_time:.2f}秒")
             self.log(f"=" * 30)
+
+            if num == final_num:
+                self.stop.set()
+                self.log(f"当前列表处理结束。")
 
             if self.stop.is_set():
                 self.log(f"***※已终止※***")
@@ -309,7 +318,7 @@ class QualityCheckStep2():
             self.stop.set()
             return ""
         
-    # 大部分分析与点评处于“略”的状态，无需审阅。
+    # 大部分分析与点评处于“略”的状态，不审阅。
     # def copy_analysis(self, page1: Page):
     #     problem_sn = page1.locator("td:nth-child(2) > a:nth-child(2)").first.inner_text()
         
