@@ -20,7 +20,7 @@ class QualityCheckStep2():
 
     def __init__(self, log_callback, result_callback, alert_callback, input_num_for_AI: str, stop_signal: threading.Event):    
         self.log = log_callback
-        self.result_log = result_callback
+        self.result = result_callback
         self.alert = alert_callback
         self.stop = stop_signal
         self.analyser = analyser.Analyser()
@@ -127,17 +127,18 @@ class QualityCheckStep2():
                 content_payload = []
                 content_payload.append({"type": "text", "text": "用latex源码仅输出图片中文本的识别内容。"})
                 content_payload.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{choices_pic64}"}})
-            if self._user_input in ['1','2','3']:
-                if os.getenv("QWEN_API_KEY") == '1':
-                    self.log(f"此AI不支持base64图像识别，请使用其他API或引入QwenAPI。")
-                    return 
+                if self._user_input in ['1','2','3']:
+                    if os.getenv("QWEN_API_KEY") == '1':
+                        self.log(f"此AI不支持base64图像识别，请使用其他API或引入QwenAPI。")
+                        return 
+                    else:
+                        choices_alltext = self.analyser.call_analyser(content_payload, '99')
                 else:
-                    choices_alltext = self.analyser.call_analyser(content_payload, '99')
-            else:
-                choices_alltext = self.analyser.call_analyser(content_payload, self._user_input)
-            print(choices_alltext)
-            if choices_alltext == '':
-                self.log(f"请求超时(120s)，或识图失败。")
+                    choices_alltext = self.analyser.call_analyser(content_payload, self._user_input)
+                print(choices_alltext)
+
+                if choices_alltext == '':
+                    self.log(f"请求超时(120s)，或识图失败。")
 
             # 于此删除本地图片
             try:
