@@ -99,29 +99,32 @@ class QualityCheckStep1():
 
             # 构造消息
             content_payload = []
-            content_payload.append({"type": "text", "text": "用latex源码仅输出图片识别内容。"})
+            content_payload.append({"type": "text", "text": "用latex源码仅输出识别内容，不得多加解释。"})
             content_payload.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{problem_base64}"}})
             if choices_path:
                 content_payload.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{choices_base64}"}})
-            problem_alltext = self.analyser.call_analyser(content_payload, '99')
+            if self._user_input in ['1','2','3']:
+                if os.getenv("QWEN_API_KEY") == '1':
+                    self.log(f"此AI不支持base64图像识别，请使用其他API或引入QwenAPI。")
+                    return 
+                else:
+                    problem_alltext = self.analyser.call_analyser(content_payload, '99')
+            else:
+                problem_alltext = self.analyser.call_analyser(content_payload, self._user_input)
             print(problem_alltext)
+            if problem_alltext == '':
+                self.log(f"请求超时(120s)，或识图失败。")
 
             # 3. 审核 
             self.log("4. 提交与 AI 审核...")
-            with ThreadPoolExecutor(max_workers=1) as executor:
-                future = executor.submit(self.analyze_answer, problem_alltext, answer, self._user_input)
-                try:
-                    result = future.result(timeout=60)
-                    ai_output = result
-                    self.log(f">>> 审核结果已返回")
-                except TimeoutError:
-                    ai_output = ""
-                    self.log(f"等待response返回超时。")
-                    self.stop.set()
-                    break
+            ai_output = self.analyze_answer(problem_alltext, answer, self._user_input)
             
             # 发送结果到 GUI 进行渲染
-            self.result(ai_output)
+            if ai_output != '':
+                self.result(ai_output)
+            else:
+                self.stop.set()
+                self.log(f"请求返回response超时(120s)")
             
             self.log(f"本次任务已完成/终止。")
             self.log('='*30)

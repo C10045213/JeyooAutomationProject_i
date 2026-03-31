@@ -127,8 +127,17 @@ class QualityCheckStep2():
                 content_payload = []
                 content_payload.append({"type": "text", "text": "用latex源码仅输出图片中文本的识别内容。"})
                 content_payload.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{choices_pic64}"}})
-                choices_alltext = self.analyser.call_analyser(content_payload, '99')
-                print(choices_alltext)
+            if self._user_input in ['1','2','3']:
+                if os.getenv("QWEN_API_KEY") == '1':
+                    self.log(f"此AI不支持base64图像识别，请使用其他API或引入QwenAPI。")
+                    return 
+                else:
+                    choices_alltext = self.analyser.call_analyser(content_payload, '99')
+            else:
+                choices_alltext = self.analyser.call_analyser(content_payload, self._user_input)
+            print(choices_alltext)
+            if choices_alltext == '':
+                self.log(f"请求超时(120s)，或识图失败。")
 
             # 于此删除本地图片
             try:
@@ -139,21 +148,14 @@ class QualityCheckStep2():
 
             # 3. 审核 
             self.log("4. 提交与 AI 审核...")
-            with ThreadPoolExecutor(max_workers=1) as executor:
-                future = executor.submit(self.analyze_answer, problem, choices_alltext, answer, keypoint, self._user_input)
-                try:
-                    result = future.result(timeout=60)
-                    ai_output = result
-                    self.log(f">>> 审核结果已返回")
-                except TimeoutError:
-                    ai_output = ""
-                    self.log(f"等待response返回超时。")
-                    self.stop.set()
-                    return
+            ai_output = self.analyze_answer(problem, choices_alltext, answer, keypoint, self._user_input)
             
             # 发送结果到 GUI 进行渲染
-            self.result_log(ai_output)
-            print(ai_output)
+            if ai_output != '':
+                self.result(ai_output)
+            else:
+                self.stop.set()
+                self.log(f"请求返回response超时(120s)")
 
             # 根据特定格式返回文本，尝试填写表单
             self.log(f"5. 正在改写表单...")

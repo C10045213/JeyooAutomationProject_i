@@ -2,6 +2,7 @@ import os
 from dotenv import load_dotenv
 from openai import OpenAI
 from google import genai
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
 
 # ====================== 1. 加载配置 ======================
 load_dotenv()  # 从 .env 文件加载环境变量
@@ -12,7 +13,6 @@ qwen_client = OpenAI(
     api_key=os.getenv("QWEN_API_KEY"),
     base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
 )
-
 
 # DeepSeek 客户端
 deepseek_client = OpenAI(
@@ -29,6 +29,13 @@ doubao_client = OpenAI(
 # Google GenAI 客户端
 google_client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
 
+# Github Models
+github_client = OpenAI(
+    api_key=os.getenv("GITHUB_API_KEY"),
+    base_url="https://models.github.ai/inference",
+)
+
+
 # ====================== 3. 通用调用核心类 ======================
 class Analyser:
     def __init__(self):
@@ -36,8 +43,9 @@ class Analyser:
         self.client_map = {
             "1": ("DeepSeek", self._call_deepseek),
             "2": ("doubao", self._call_doubao),
-            "3": ("Google Gemini", self._call_google),
-            "4": ("Qwen", self._call_qwen),
+            "3": ("Google Gemini(flash-latest)", self._call_google),
+            "4": ("Qwen3.5flash", self._call_qwen),
+            "5": ("ChatGPT(github-4.1mini)", self._call_github),
             "99": ("QwenVL", self._call_qwenvl)
         }
 
@@ -99,6 +107,21 @@ class Analyser:
         # 解析Qwen返回文本
         return(response.choices[0].message.content)
     
+    def _call_github(self, content: str):
+        response = github_client.chat.completions.create(
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a helpful assistant.",
+                },  
+                {"role": "user", "content": content}
+            ],
+            temperature=1,
+            top_p=1,
+            model="openai/gpt-4.1-mini"
+        )
+        return response.choices[0].message.content
+    
     def _call_qwenvl(self, content: str):
         """Qwen快速识别"""
         response = qwen_client.chat.completions.create(
@@ -108,13 +131,19 @@ class Analyser:
         )
         # 解析Qwen返回文本
         return(response.choices[0].message.content)
+    
 
     def call_analyser(self, content: str, num: str) -> str:
         """通用审核入口：一键调用，自动适配所有客户端"""
         call_func = self.select_analyser_client(num)
         try:
-            result = call_func(content)
-            return result
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(call_func, content)
+                try:
+                    result = future.result(timeout=120)
+                    return result
+                except TimeoutError:
+                    return ''
         except Exception as e:
-            print(f"API调用失败: {e}")
-            return f"Error: API调用失败 - {e}"
+            print(e)
+            return ''
