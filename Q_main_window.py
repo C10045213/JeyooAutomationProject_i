@@ -184,9 +184,10 @@ class MainWindow(QMainWindow):
 
     def render_markdown(self, markdown_text):
         def texreplace(text):
-            # 双反斜杠与单星转义
+            # 双反斜杠与单星转义、单下划线紧随大括号转义
             text = text.replace('\\', '\\\\')
             text = re.sub(r'(?<!\*)\^\*(?!\*)', r'^\\*', text)
+            text = text.replace('_{', '\\_{')
             print(repr(text))
             return text
         
