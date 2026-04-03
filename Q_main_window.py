@@ -1,6 +1,7 @@
 import os
 import sys
 import markdown
+import re
 
 # PyQt6 导入
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,  QPushButton,
@@ -183,10 +184,11 @@ class MainWindow(QMainWindow):
 
     def render_markdown(self, markdown_text):
         def texreplace(text):
-            # 先把双反斜杠转义，防止被 Markdown 吃掉
-            # 这一步非常激进，建议仅针对公式块处理，但在简单场景下可用
-            text = text.replace('\\\\', '\\') 
-            text = text.replace('\\', '\\\\') 
+            # 双反斜杠与单星转义、单下划线紧随大括号转义
+            text = text.replace('\\', '\\\\')
+            text = re.sub(r'(?<!\*)\^\*(?!\*)', r'^\\*', text)
+            text = text.replace('_{', '\\_{')
+            print(repr(text))
             return text
         
         markdown_text = texreplace(markdown_text) 

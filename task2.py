@@ -272,7 +272,7 @@ class QualityCheckStep2():
         text = ai_output
         text = text.replace("```", "")
         text = text.replace("json\n", "")
-        text = text.replace("\\\\", "\\")
+        # text = text.replace("\\\\", "\\")
         text = text.replace("\\", "\\\\")
         text = text.replace(" ", "")
         text = text.replace("【", "")
@@ -401,7 +401,9 @@ class QualityCheckStep2():
             page1.wait_for_timeout(200)
             iframe = page1.frame_locator("#htmlSourceFrame")
             textarea = iframe.locator("textarea#htmlSource")
-            textarea.fill(data["analysis"]["msg"].replace("。", "。\n"))
+            analysis_text = data["analysis"]["msg"].replace("。", "。\n")
+            analysis_text = analysis_text.replace("\\\\", "\\")
+            textarea.fill(analysis_text)
             iframe.locator("div:nth-child(3) > input:nth-child(3)").click()
             page1.wait_for_timeout(200)
 
@@ -412,7 +414,9 @@ class QualityCheckStep2():
             page1.wait_for_timeout(200)
             iframe = page1.frame_locator("#htmlSourceFrame")
             textarea = iframe.locator("textarea#htmlSource")
-            textarea.fill(data["discuss"]["msg"])
+            discuss_text = data["discuss"]["msg"].replace("。", "。\n")
+            discuss_text = discuss_text.replace("\\\\", "\\")
+            textarea.fill(discuss_text)
             iframe.locator("div:nth-child(3) > input:nth-child(3)").click()
             page1.wait_for_timeout(200)
 
