@@ -84,7 +84,7 @@ class Analyser:
                     ],
                 }
             ],
-            reasoning_effort = "minimal",
+            reasoning={"effort": "minimal"}
         )
         # 解析DUOBAO返回文本
         return response.output_text
