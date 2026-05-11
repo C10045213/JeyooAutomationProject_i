@@ -1,8 +1,12 @@
 pip install dotenv
 pip install playwright
-pip install PyQt6 PyQt6-WebEngine
 pip install openai google-genai
-pip install keyboard pyperclip markdown
+pip install pyperclip
 
 taskkill /F /IM msedge.exe
 "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" -ArgumentList "--remote-debugging-port=9222"
+
+--- CLI 用法 ---
+python cli_main.py                 # 交互模式
+python cli_main.py --api 4         # 预选模型 4
+python cli_main.py --api 4 --task1 # 预选模型 + 任务1

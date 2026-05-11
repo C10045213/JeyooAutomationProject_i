@@ -1,9 +1,8 @@
 import AI_analyse_V1 as analyser
-import os
+import os, time
 import pyperclip
 import base64
 import threading
-from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from playwright.sync_api import Page
 
 class QualityCheckStep1():
@@ -58,6 +57,7 @@ class QualityCheckStep1():
             self.log(f"***※已终止※***")
 
         while not self.stop.is_set():
+            start_time = time.perf_counter()
             self.log("\n>>> 开始执行任务...")
             problem_alltext = ""
 
@@ -121,13 +121,13 @@ class QualityCheckStep1():
             
             # 发送结果到 GUI 进行渲染
             if ai_output != '':
+                end_time = time.perf_counter()
                 self.result(ai_output)
             else:
                 self.stop.set()
                 self.log(f"请求返回response超时(120s)")
             
-            self.log(f"本次任务已完成/终止。")
-            self.log('='*30)
+            self.log(f"本次任务已完成/终止。本次耗时{end_time - start_time:.2f}s。")
             break
 
     def problem_screenshot(self, operator_page):
