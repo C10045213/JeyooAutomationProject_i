@@ -23,7 +23,6 @@ class AutomationWorker(QThread):
         super().__init__()
         self.running = True
         self.hotkey = 'ctrl+alt+z' # 于此确认设置HOTKEY
-        # self.save_hotkey = 'ctrl+alt+x' # 于此设置任务2存储专用HOTKEY
         self.stop_hotkey = 'ctrl+alt+d' # 于此设置任务2的停止HOTKEY
         self.analyser = Analyser()
         
@@ -49,7 +48,6 @@ class AutomationWorker(QThread):
         self.current_strategy = None
         self.method_thread = None
         self.stop_signal = threading.Event()
-        # self.save_event = threading.Event() #TASK#2题目直答等待确认线程控制（或将作为TASK#3）
 
     def request_change_strategy_to_task1(self):
         self._requested_change_to_task1 = True
@@ -66,11 +64,6 @@ class AutomationWorker(QThread):
     def _hotkey_callback(self):
         self._task_requested = True
         self.log_signal.emit(f"请等待...")
-
-    # TASK#2直答专用快捷键
-    # def _save_hotkey_callback(self):
-    #     self._save_task_requested = True
-    #     self.save_event.set()
 
     # 处理终止
     def halt(self):
@@ -97,8 +90,6 @@ class AutomationWorker(QThread):
         self.log_signal.emit(f"TASK#2: {task2.QualityCheckStep2.__doc__}")
 
         keyboard.add_hotkey(self.hotkey, self._hotkey_callback)
-        # TASK#2直答专用快捷键
-        # keyboard.add_hotkey(self.save_hotkey, self._save_hotkey_callback)
         keyboard.add_hotkey(self.stop_hotkey, self.halt)
         self._rechooseAPI_requested = True 
 
@@ -122,30 +113,6 @@ class AutomationWorker(QThread):
                         else:
                             self.log_signal.emit(f"任务执行其他异常: {e}")
                     
-                    # self.save_event.clear()
-
-                    # TASK#2 直答专用
-                    # if self._task2_flag:
-                    #     self.log_signal.emit(f"按下: {self.save_hotkey} 以执行保存与翻页")
-                    #     self.save_event.clear()
-                    #     self._save_task_requested = False
-                    #     self.save_event.wait(timeout=30)
-                    #     if self._save_task_requested:
-                    #         self._save_task_requested = False
-                    #         try:
-                    #             self.current_strategy.saven_next()
-                    #             self.log_signal.emit(f"本次任务已完成。")
-                    #         except Exception as e:
-                    #             self.log_signal.emit(f"保存与翻页执行异常: {e}")
-                    #             print(f"保存与翻页执行异常: {e}")
-                            
-                    #         self.log_signal.emit('='*30)
-                    #         self.save_event.clear()
-                    #     else:
-                    #         self.log_signal.emit(f"等待超时，本次任务已终止。")
-                    #         self.log_signal.emit('='*30)
-                    #         self.save_event.clear()
-
                 else:
                     self.log_signal.emit(f"未设置任务策略！")
 
@@ -201,7 +168,7 @@ class AutomationWorker(QThread):
                 except Exception as e:
                     print(f"检查进程失败: {e}")
 
-            time.sleep(5)
+            time.sleep(0.2)
             
         # 退出时清理
         self.browser_manager.close()

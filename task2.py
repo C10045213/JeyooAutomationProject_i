@@ -7,8 +7,6 @@ from playwright.sync_api import Page
 import json
 import time
 import threading
-from concurrent.futures import ThreadPoolExecutor, TimeoutError
-
 
 class QualityCheckStep2():
     """修题逻辑"""
@@ -82,6 +80,7 @@ class QualityCheckStep2():
 
         # 先保存当前页修改
         self.save()
+
         if self.stop.is_set():
             self.log(f"***※已终止※***")
 
@@ -329,44 +328,12 @@ class QualityCheckStep2():
             self.stop.set()
             return ""
         
-    # 大部分分析与点评处于“略”的状态，不审阅。
-    # def copy_analysis(self, page1: Page):
-    #     problem_sn = page1.locator("td:nth-child(2) > a:nth-child(2)").first.inner_text()
-        
-    #     try:
-    #         # 按页面元素交互逻辑复制解答
-    #         page1.locator("div#Analyse_" + problem_sn).click()
-    #         page1.locator("input.code").click()
-    #         iframe = page1.frame_locator("#htmlSourceFrame")
-    #         textarea = iframe.locator("textarea#htmlSource")
-    #         textarea.click()
-    #         page1.keyboard.press("Control+A")
-    #         page1.keyboard.press("Control+C")
-    #         content = pyperclip.paste()
-    #         page1.locator("input.hclose:nth-child(2)").click()
-    #         return content
-        
-    #     except Exception as e:
-    #         self.log(f"搜索复制失败: {e}")
-    #         self.stop.set()
-    #         return ""
-        
     def copy_discuss(self, page1: Page):
         problem_sn = page1.locator("td:nth-child(2) > a:nth-child(2)").first.inner_text()
         
         try:
             # 按页面元素交互逻辑复制
-            page1.locator("div#Discuss_" + problem_sn).click()
-            page1.wait_for_timeout(200)
-            page1.locator("input.code").click()
-            page1.wait_for_timeout(200)
-            iframe = page1.frame_locator("#htmlSourceFrame")
-            textarea = iframe.locator("textarea#htmlSource")
-            textarea.click()
-            page1.keyboard.press("Control+A")
-            page1.keyboard.press("Control+C")
-            content = pyperclip.paste()
-            page1.locator("input.hclose:nth-child(2)").click()
+            content = page1.locator("div#Discuss_" + problem_sn).inner_text()
             page1.wait_for_timeout(200)
             return content
         
@@ -395,40 +362,19 @@ class QualityCheckStep2():
 
         try:
             # 填写分析
-            page1.locator("div#Analyse_" + problem_sn).click()
-            page1.wait_for_timeout(200)
-            page1.locator("input.code").click()
-            page1.wait_for_timeout(200)
-            iframe = page1.frame_locator("#htmlSourceFrame")
-            textarea = iframe.locator("textarea#htmlSource")
-            analysis_text = data["analysis"]["msg"].replace("。", "。\n")
-            analysis_text = analysis_text.replace("\\\\", "\\")
-            textarea.fill(analysis_text)
-            iframe.locator("div:nth-child(3) > input:nth-child(3)").click()
+            content: str = ""
+            content = data["analysis"]["msg"]
+            content = content.replace("。", "。\n")
+            content = content.replace("\\\\", "\\")
+            page1.locator("div#Analyse_" + problem_sn).fill(content)
             page1.wait_for_timeout(200)
 
             # 填写点评
-            page1.locator("div#Discuss_" + problem_sn).click()
+            content = data["discuss"]["msg"]
+            content = content.replace("。", "。\n")
+            content = content.replace("\\\\", "\\")
+            page1.locator("div#Discuss_" + problem_sn).fill(content)
             page1.wait_for_timeout(200)
-            page1.locator("input.code").click()
-            page1.wait_for_timeout(200)
-            iframe = page1.frame_locator("#htmlSourceFrame")
-            textarea = iframe.locator("textarea#htmlSource")
-            discuss_text = data["discuss"]["msg"].replace("。", "。\n")
-            discuss_text = discuss_text.replace("\\\\", "\\")
-            textarea.fill(discuss_text)
-            iframe.locator("div:nth-child(3) > input:nth-child(3)").click()
-            page1.wait_for_timeout(200)
-
-            # 判断解答，并填写解答
-            # 暂不直接于此解答
-            # if data["answer"]["s"] !='1':
-            #     page1.locator("div#Method_" + problem_sn).click()
-            #     page1.locator("input.code").click()
-            #     iframe = page1.frame_locator("#htmlSourceFrame")
-            #     textarea = iframe.locator("textarea#htmlSource")
-            #     textarea.fill(data["answer"]["msg"].replace("。", "。\n"))
-            #     iframe.locator("div:nth-child(3) > input:nth-child(3)").click()
 
             # 填写难度
             page1.locator("input#Degree_" + problem_sn + "_" + str(data["difficulty"])).click() 
@@ -443,6 +389,9 @@ class QualityCheckStep2():
     def save(self):
         try:
             self.page_1.get_by_role('button',name='保存').click()
+            time.sleep(0.2)
+            if self.page_1.locator("div#_messsage").is_visible():
+                self.page_1.locator("div#_messsage").click()
         except Exception as e:
             self.log(f"***※保存异常※***")
             print(e)

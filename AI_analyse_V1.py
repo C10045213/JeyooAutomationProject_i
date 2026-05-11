@@ -5,7 +5,7 @@ from google import genai
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 
 # ====================== 1. 加载配置 ======================
-load_dotenv()  # 从 .env 文件加载环境变量
+load_dotenv(override=True)  # 从 .env 文件加载环境变量
 
 # ====================== 2. 初始化各客户端 ======================
 # QWEN 客户端（OCR用，保留参考）
@@ -41,8 +41,8 @@ class Analyser:
     def __init__(self):
         # 客户端映射：key=选择编号，value=(名称, 通用调用函数)
         self.client_map = {
-            "1": ("DeepSeek", self._call_deepseek),
-            "2": ("doubao", self._call_doubao),
+            "1": ("DeepSeek-V4-flash", self._call_deepseek),
+            "2": ("doubao-2.0-lite", self._call_doubao),
             "3": ("Google Gemini(flash-latest)", self._call_google),
             "4": ("Qwen3.5flash", self._call_qwen),
             "5": ("ChatGPT(github-4.1mini)", self._call_github),
@@ -62,7 +62,7 @@ class Analyser:
     def _call_deepseek(self, content: str) :
         """封装DeepSeek调用 + 结果解析"""
         response = deepseek_client.chat.completions.create(
-            model="deepseek-chat",
+            model="deepseek-v4-flash",
             messages=[{"role": "user", "content": content}], 
             stream=False
         )
@@ -83,7 +83,8 @@ class Analyser:
                          }
                     ],
                 }
-            ]
+            ],
+            reasoning_effort = "minimal",
         )
         # 解析DUOBAO返回文本
         return response.output_text
